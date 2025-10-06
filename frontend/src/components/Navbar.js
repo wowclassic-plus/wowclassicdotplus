@@ -5,15 +5,14 @@ function Navbar() {
   return (
     <nav
       style={{
-        position: "fixed",          // stick to top
+        position: "sticky",  // instead of fixed
         top: 0,
-        left: 0,
-        width: "100%",             // full width
+        width: "100%",
         display: "flex",
         justifyContent: "center",
         padding: "20px",
         backgroundColor: "rgba(0,0,0,0.8)",
-        zIndex: 1000,              // stay on top
+        zIndex: 1000,
         boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
       }}
     >
