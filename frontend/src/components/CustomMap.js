@@ -415,7 +415,7 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
             <Polygon
               key={idx}
               positions={poly.coords}
-              pathOptions={{ color: "red", fillOpacity: 0 }}
+              pathOptions={{ color: "transparent", fillOpacity: 0 }}
             >
               <Popup>{poly.name}</Popup>
             </Polygon>
