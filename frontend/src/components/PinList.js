@@ -78,7 +78,6 @@ function PinsList({ backendUrl }) {
         session_id: sessionId,
         vote_type: type,
       };
-      console.log("Voting payload:", payload);
       const res = await fetch(`${backendUrl}/pins/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
