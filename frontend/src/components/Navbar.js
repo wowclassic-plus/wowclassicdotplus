@@ -5,7 +5,7 @@ function Navbar() {
   return (
     <nav
       style={{
-        position: "sticky",  // instead of fixed
+        position: "fixed",  // instead of fixed
         top: 0,
         width: "100%",
         display: "flex",

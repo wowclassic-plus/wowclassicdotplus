@@ -88,16 +88,25 @@ function AddPinOnClick({ setNewPinCoords }) {
 // Zoom map to selected polygon
 function ZoomToRegion({ polygons, selectedRegion, imageBounds }) {
   const map = useMap();
+  const [lastRegion, setLastRegion] = React.useState(selectedRegion);
+
   useEffect(() => {
+    // Only recenter if region actually changed
+    if (selectedRegion === lastRegion) return;
+
     if (!selectedRegion) {
       map.fitBounds(imageBounds);
-      return;
+    } else {
+      const poly = polygons.find((p) => p.name === selectedRegion);
+      if (poly) map.fitBounds(L.latLngBounds(poly.coords));
     }
-    const poly = polygons.find((p) => p.name === selectedRegion);
-    if (poly) map.fitBounds(L.latLngBounds(poly.coords));
-  }, [selectedRegion, polygons, map, imageBounds]);
+
+    setLastRegion(selectedRegion);
+  }, [selectedRegion, lastRegion, polygons, imageBounds, map]);
+
   return null;
 }
+
 
 // Pan to pin from route
 function PanToPin() {
@@ -148,8 +157,10 @@ export default function CustomMap({ backendUrl }) {
   };
 
   const isPinInPolygon = (pin, coords) => {
-    const latlng = L.latLng(pin.x, pin.y);
-    return L.polygon(coords).getBounds().contains(latlng);
+    const polygon = turf.polygon([coords.map(([lat, lng]) => [lng, lat])]); 
+    // pin.x = lat, pin.y = lng  (flip if needed)
+    const point = turf.point([pin.y, pin.x]); 
+    return turf.booleanPointInPolygon(point, polygon);
   };
 
   // Filter pins
@@ -160,6 +171,23 @@ export default function CustomMap({ backendUrl }) {
     if (!poly) return true;
     return isPinInPolygon(pin, poly.coords);
   });
+
+  // const isPinInPolygon = (pin, coords) => {
+  //   // ⚠️ Important: Leaflet wants (lat, lng) order
+  //   const latlng = L.latLng(pin.y, pin.x);
+  //   return L.polygon(coords).getBounds().contains(latlng);
+  // };
+
+  // const filteredPins = pins.filter((pin) => {
+  //   if (!selectedCategories.includes(pin.category)) return false;
+  //   if (!selectedRegion) return true;
+
+  //   const poly = polygons.find((p) => p.name === selectedRegion);
+  //   if (!poly) return true;
+
+  //   return isPinInPolygon(pin, poly.coords);
+  // });
+
 
   // Fetch pins
   useEffect(() => {
@@ -352,6 +380,7 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
 }
 
   return (
+    <div style={{ paddingTop: "60px" }}>
     <div style={{ display: "flex", height: "100vh" }}>
       {/* Left: Map */}
       <div style={{ flex: 4, position: "relative" }}>
@@ -359,7 +388,11 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
           crs={L.CRS.Simple}
           bounds={imageBounds}
           maxBounds={imageBounds}
-          style={{ width: "100%", height: "100%" }}
+          style={{
+            width: "100%",
+            height: "calc(100vh - 60px)", // subtract navbar height
+            display: "block",
+          }}
           doubleClickZoom={false}
         >
           <PanToPin />
@@ -382,7 +415,7 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
             <Polygon
               key={idx}
               positions={poly.coords}
-              pathOptions={{ color: "transparent", fillOpacity: 0 }}
+              pathOptions={{ color: "red", fillOpacity: 0 }}
             >
               <Popup>{poly.name}</Popup>
             </Polygon>
@@ -558,6 +591,7 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
   )}
 </div>
 
+    </div>
     </div>
   );
 }
