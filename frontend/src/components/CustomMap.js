@@ -164,30 +164,15 @@ export default function CustomMap({ backendUrl }) {
   };
 
   // Filter pins
-  const filteredPins = pins.filter((pin) => {
+  const filteredPins = pins
+  .filter((pin) => {
     if (!selectedCategories.includes(pin.category)) return false;
     if (!selectedRegion) return true;
     const poly = polygons.find((p) => p.name === selectedRegion);
     if (!poly) return true;
     return isPinInPolygon(pin, poly.coords);
-  });
-
-  // const isPinInPolygon = (pin, coords) => {
-  //   // ⚠️ Important: Leaflet wants (lat, lng) order
-  //   const latlng = L.latLng(pin.y, pin.x);
-  //   return L.polygon(coords).getBounds().contains(latlng);
-  // };
-
-  // const filteredPins = pins.filter((pin) => {
-  //   if (!selectedCategories.includes(pin.category)) return false;
-  //   if (!selectedRegion) return true;
-
-  //   const poly = polygons.find((p) => p.name === selectedRegion);
-  //   if (!poly) return true;
-
-  //   return isPinInPolygon(pin, poly.coords);
-  // });
-
+  })
+  .sort((a, b) => b.upvotes - a.upvotes);
 
   // Fetch pins
   useEffect(() => {
