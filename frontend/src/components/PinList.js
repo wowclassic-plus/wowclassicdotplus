@@ -3,22 +3,28 @@ import { useNavigate } from "react-router-dom";
 import * as turf from "@turf/turf";
 import polygons from "./polygons";
 
-// Generate/reuse session ID for this browser tab
 let sessionId = sessionStorage.getItem("session_id");
 if (!sessionId) {
   sessionId = crypto.randomUUID();
   sessionStorage.setItem("session_id", sessionId);
 }
 
+// --- Category color map ---
+const CATEGORY_COLORS = {
+  lore: "#3b82f6",
+  quest: "#22c55e",
+  raid: "#ef4444",
+  dungeon: "#eab308",
+  other: "#8b5cf6",
+};
+
 function PinsList({ backendUrl }) {
   const [pins, setPins] = useState([]);
-  const [sortConfig, setSortConfig] = useState({ key: "id", direction: "ascending" });
-  const [filters, setFilters] = useState({ description: "", category: "", polygon: "" });
-  const [votedPins, setVotedPins] = useState({}); // { pinId: "up" | "down" }
-
+  const [filters, setFilters] = useState({ description: "", categories: [], polygon: "" });
+  const [votedPins, setVotedPins] = useState({});
   const navigate = useNavigate();
 
-  // --- Load pins and votes from backend ---
+  // --- Load pins and votes ---
   useEffect(() => {
     const fetchPins = async () => {
       try {
@@ -34,13 +40,10 @@ function PinsList({ backendUrl }) {
 
         setPins(enriched);
 
-        // Fetch votes for this session+IP
         const voteRes = await fetch(`${backendUrl}/pins/votes/${sessionId}`);
         const votes = await voteRes.json();
         const voteMap = {};
-        votes.forEach((v) => {
-          voteMap[v.pin_id] = v.vote_type;
-        });
+        votes.forEach((v) => (voteMap[v.pin_id] = v.vote_type));
         setVotedPins(voteMap);
       } catch (err) {
         console.error("Failed to load pins or votes:", err);
@@ -48,11 +51,11 @@ function PinsList({ backendUrl }) {
     };
 
     fetchPins();
-    const interval = setInterval(fetchPins, 5000); // refresh every 5s
-
+    const interval = setInterval(fetchPins, 5000);
     return () => clearInterval(interval);
   }, [backendUrl]);
 
+  // --- Helper: determine polygon for each pin ---
   const getPolygonName = (pin) => {
     const point = turf.point([pin.y, pin.x]);
     for (const poly of polygons) {
@@ -64,7 +67,7 @@ function PinsList({ backendUrl }) {
 
   const goToMap = (pin) => navigate("/map", { state: { lat: pin.x, lng: pin.y } });
 
-  // --- Handle voting ---
+  // --- Voting ---
   const votePin = async (pinId, type) => {
     const pin = pins.find((p) => p.id === pinId);
     if (!pin) return;
@@ -73,11 +76,7 @@ function PinsList({ backendUrl }) {
     let updatedPin = { ...pin };
 
     try {
-      const payload = {
-        pin_id: pinId,
-        session_id: sessionId,
-        vote_type: type,
-      };
+      const payload = { pin_id: pinId, session_id: sessionId, vote_type: type };
       const res = await fetch(`${backendUrl}/pins/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,23 +86,14 @@ function PinsList({ backendUrl }) {
       if (!res.ok) throw new Error("Vote failed");
 
       const updated = await res.json();
+      updatedPin = { ...pin, upvotes: updated.upvotes, downvotes: updated.downvotes };
 
-      // Update pin counts locally
-      updatedPin = {
-        ...pin,
-        upvotes: updated.upvotes,
-        downvotes: updated.downvotes,
-      };
       setPins((prev) => prev.map((p) => (p.id === pinId ? updatedPin : p)));
 
-      // Update votedPins map
       setVotedPins((prev) => {
         const newVotes = { ...prev };
-        if (currentVote === type) {
-          delete newVotes[pinId]; // undo vote
-        } else {
-          newVotes[pinId] = type; // new vote or switch
-        }
+        if (currentVote === type) delete newVotes[pinId];
+        else newVotes[pinId] = type;
         return newVotes;
       });
     } catch (err) {
@@ -111,147 +101,235 @@ function PinsList({ backendUrl }) {
     }
   };
 
-  // --- Sorting ---
-  const requestSort = (key) => {
-    let direction = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending") direction = "descending";
-    setSortConfig({ key, direction });
+  // --- Unique category list ---
+  const categories = useMemo(
+    () => [...new Set(pins.map((p) => p.category).filter(Boolean))],
+    [pins]
+  );
+
+  const handleCategoryChange = (cat) => {
+    setFilters((prev) => {
+      const updated = prev.categories.includes(cat)
+        ? prev.categories.filter((c) => c !== cat)
+        : [...prev.categories, cat];
+      return { ...prev, categories: updated };
+    });
   };
 
-  const sortedPins = useMemo(() => {
-    let sortablePins = [...pins];
+  // --- Filter + sort (highest upvotes first) ---
+  const filteredPins = useMemo(() => {
+    return pins
+      .filter((pin) => {
+        const desc = (pin.description || "").toLowerCase();
+        const cat = (pin.category || "").toLowerCase();
+        const poly = (pin.polygon || "").toLowerCase();
 
-    // Filtering
-    sortablePins = sortablePins.filter((pin) => {
-      return (
-        pin.description.toLowerCase().includes(filters.description.toLowerCase()) &&
-        pin.category.toLowerCase().includes(filters.category.toLowerCase()) &&
-        (pin.polygon || "").toLowerCase().includes(filters.polygon.toLowerCase())
-      );
-    });
+        const matchesDesc = desc.includes(filters.description.toLowerCase());
+        const matchesCat =
+          filters.categories.length === 0 ||
+          filters.categories.map((c) => c.toLowerCase()).includes(cat);
+        const matchesPoly =
+          !filters.polygon || poly === filters.polygon.toLowerCase();
 
-    // Sorting
-    if (sortConfig.key) {
-      sortablePins.sort((a, b) => {
-        const aValue = a[sortConfig.key] || "";
-        const bValue = b[sortConfig.key] || "";
-        if (typeof aValue === "string")
-          return sortConfig.direction === "ascending"
-            ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
-        else return sortConfig.direction === "ascending" ? aValue - bValue : bValue - aValue;
-      });
-    }
+        return matchesDesc && matchesCat && matchesPoly;
+      })
+      .sort((a, b) => b.upvotes - a.upvotes);
+  }, [pins, filters]);
 
-    return sortablePins;
-  }, [pins, sortConfig, filters]);
+  // --- Styles ---
+  const containerStyle = {
+    maxWidth: "900px",
+    margin: "80px auto",
+    padding: "0 20px",
+    color: "#000000ff",
+    backgroundColor: "#0e0e0eff",
+    fontFamily: "system-ui, sans-serif",
+  };
+
+  const cardBaseStyle = {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderRadius: "10px",
+    padding: "16px",
+    marginBottom: "18px",
+    backgroundColor: "#2d2d2d",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+  };
 
   return (
-    <div style={{ maxWidth: "900px", margin: "100px auto" }}>
-      <h2>All Pins</h2>
+    <div style={containerStyle}>
+      <h2 style={{ textAlign: "center", marginBottom: "20px", color: "#f8fafc" }}>
+        All Pins
+      </h2>
 
       {/* Filters */}
-      <div style={{ marginBottom: "15px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginBottom: "25px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "10px",
+        }}
+      >
         <input
-          placeholder="Filter Description"
+          placeholder="Search description..."
           value={filters.description}
           onChange={(e) => setFilters({ ...filters, description: e.target.value })}
+          style={{
+            padding: "8px",
+            borderRadius: "5px",
+            border: "1px solid #555",
+            backgroundColor: "#333",
+            color: "#f1f5f9",
+            width: "60%",
+          }}
         />
-        <input
-          placeholder="Filter Category"
-          value={filters.category}
-          onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-        />
-        <input
-          placeholder="Filter Zone"
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+          {categories.map((cat) => (
+            <label key={cat} style={{ color: "#ddd", textTransform: "capitalize" }}>
+              <input
+                type="checkbox"
+                checked={filters.categories.includes(cat)}
+                onChange={() => handleCategoryChange(cat)}
+              />{" "}
+              {cat}
+            </label>
+          ))}
+        </div>
+
+        <select
           value={filters.polygon}
           onChange={(e) => setFilters({ ...filters, polygon: e.target.value })}
-        />
+          style={{
+            padding: "8px",
+            borderRadius: "5px",
+            border: "1px solid #555",
+            backgroundColor: "#333",
+            color: "#f1f5f9",
+            width: "200px",
+          }}
+        >
+          <option value="">All Zones</option>
+          {polygons.map((poly) => (
+            <option key={poly.name} value={poly.name}>
+              {poly.name}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-        <thead>
-          <tr>
-            {["#", "name", "description", "category", "x", "y", "zone"].map((col) => (
-              <th
-                key={col}
-                style={{ borderBottom: "1px solid #ccc", padding: "8px", cursor: "pointer" }}
-                onClick={() => requestSort(col === "#" ? "id" : col)}
-              >
-                {col.charAt(0).toUpperCase() + col.slice(1)}
-                {sortConfig.key === (col === "#" ? "id" : col)
-                  ? sortConfig.direction === "ascending"
-                    ? " ▲"
-                    : " ▼"
-                  : null}
-              </th>
-            ))}
-            <th style={{ borderBottom: "1px solid #ccc", padding: "8px" }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedPins.map((pin, index) => (
-            <tr key={pin.id}>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{index + 1}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.name}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.description}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.category}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.x.toFixed(1)}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.y.toFixed(1)}</td>
-              <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{pin.polygon || "None"}</td>
-              <td
+      {/* Forum-style pins */}
+      {filteredPins.map((pin) => {
+        const catColor =
+          CATEGORY_COLORS[pin.category?.toLowerCase()] || CATEGORY_COLORS.other;
+
+        return (
+          <div
+            key={pin.id}
+            style={{
+              ...cardBaseStyle,
+              borderLeft: `8px solid ${catColor}`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.01)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+            }}
+          >
+            {/* Left column: votes */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                marginRight: "16px",
+                color: "#e2e8f0",
+                minWidth: "50px",
+              }}
+            >
+              <button
+                onClick={() => votePin(pin.id, "up")}
+                disabled={votedPins[pin.id] === "up"}
                 style={{
-                  padding: "8px",
-                  borderBottom: "1px solid #eee",
-                  display: "flex",
-                  gap: "5px",
-                  flexWrap: "wrap",
+                  background: "none",
+                  border: "none",
+                  color: votedPins[pin.id] === "up" ? "#4ade80" : "#94a3b8",
+                  fontSize: "20px",
+                  cursor: "pointer",
                 }}
               >
-                <button
-                  onClick={() => votePin(pin.id, "up")}
-                  disabled={votedPins[pin.id] === "up"}
+                ▲
+              </button>
+              <div style={{ fontWeight: "bold", fontSize: "16px" }}>
+                {pin.upvotes - pin.downvotes}
+              </div>
+              <button
+                onClick={() => votePin(pin.id, "down")}
+                disabled={votedPins[pin.id] === "down"}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: votedPins[pin.id] === "down" ? "#f87171" : "#94a3b8",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                }}
+              >
+                ▼
+              </button>
+            </div>
+
+            {/* Right column: content */}
+            <div style={{ flex: 1 }}>
+              <div style={{ marginBottom: "8px" }}>
+                <span
                   style={{
-                    background: votedPins[pin.id] === "up" ? "green" : "",
-                    color: votedPins[pin.id] === "up" ? "white" : "",
-                    padding: "5px 10px",
-                    borderRadius: "3px",
-                    cursor: votedPins[pin.id] === "up" ? "default" : "pointer",
-                  }}
-                >
-                  👍 {pin.upvotes}
-                </button>
-                <button
-                  onClick={() => votePin(pin.id, "down")}
-                  disabled={votedPins[pin.id] === "down"}
-                  style={{
-                    background: votedPins[pin.id] === "down" ? "red" : "",
-                    color: votedPins[pin.id] === "down" ? "white" : "",
-                    padding: "5px 10px",
-                    borderRadius: "3px",
-                    cursor: votedPins[pin.id] === "down" ? "default" : "pointer",
-                  }}
-                >
-                  👎 {pin.downvotes}
-                </button>
-                <button
-                  onClick={() => goToMap(pin)}
-                  style={{
-                    background: "#007bff",
+                    backgroundColor: catColor,
                     color: "white",
-                    border: "none",
-                    padding: "5px 10px",
-                    borderRadius: "3px",
-                    cursor: "pointer",
+                    borderRadius: "6px",
+                    padding: "2px 8px",
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    marginRight: "8px",
                   }}
                 >
-                  Go to Map
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  {pin.category || "Other"}
+                </span>
+                <span style={{ color: "#9ca3af" }}>
+                  Zone: {pin.polygon || "Unassigned"}
+                </span>
+              </div>
+
+              <h3 style={{ margin: "4px 0", color: "#f1f5f9" }}>{pin.name}</h3>
+              <p style={{ color: "#cbd5e1", marginBottom: "8px" }}>
+                {pin.description}
+              </p>
+
+              <button
+                onClick={() => goToMap(pin)}
+                style={{
+                  marginTop: "6px",
+                  backgroundColor: "#2563eb",
+                  border: "none",
+                  borderRadius: "5px",
+                  color: "white",
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                View on Map
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
