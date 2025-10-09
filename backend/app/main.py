@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import items, survey, pins, admin
+from app.routers import items, survey, pins, admin, auth
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
@@ -25,6 +25,7 @@ app.include_router(items.router)
 app.include_router(survey.router)
 app.include_router(pins.router)
 app.include_router(admin.router)
+app.include_router(auth.router) 
 
 
 @app.get("/")
