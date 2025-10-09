@@ -10,13 +10,14 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 import requests
 import os
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/auth/discord", tags=["auth"])
 
 # ⚠️ Do NOT hardcode secrets in code; use environment variables
-CLIENT_ID = "1425731842442526733"
-CLIENT_SECRET = "z7FpwnFB_FSo2c3yjZmGBB3JpxhUde7V"
-REDIRECT_URI = "http://localhost:3000/auth/callback"
+CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")#"1425731842442526733"
+CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")#"z7FpwnFB_FSo2c3yjZmGBB3JpxhUde7V"
+REDIRECT_URI = os.getenv("REDIRECT_URI")#"http://localhost:3000/auth/callback"
 
 
 @router.get("/callback")
