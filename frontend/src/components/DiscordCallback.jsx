@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { UserContext } from "./UserContext";
 
-const BACKEND_URL = "https://classic-plus-site-frontend.onrender.com/auth/callback"
+const BACKEND_URL = "https://classic-plus-site.onrender.com/auth/callback"
 
 export default function DiscordCallback() {
   const navigate = useNavigate();
