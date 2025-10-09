@@ -1,8 +1,13 @@
 import React, {useContext} from "react";
 import { UserContext } from "./UserContext";
 
-const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID;
-const FRONTEND_REDIRECT = process.env.REACT_APP_FRONTEND_REDIRECT;
+// const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID;
+// const FRONTEND_REDIRECT = process.env.REACT_APP_FRONTEND_REDIRECT;
+const CLIENT_ID="1425731842442526733"
+const FRONTEND_REDIRECT="https://classic-plus-site-frontend.onrender.com/auth/callback"
+
+console.log("CLIENT_ID:", CLIENT_ID);
+console.log("FRONTEND_REDIRECT:", FRONTEND_REDIRECT);
 
 export default function NavbarDiscordLogin() {
   const { user, logout } = useContext(UserContext);
