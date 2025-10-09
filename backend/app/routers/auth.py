@@ -15,7 +15,7 @@ router = APIRouter(prefix="/auth/discord", tags=["auth"])
 
 # ⚠️ Do NOT hardcode secrets in code; use environment variables
 CLIENT_ID = "1425731842442526733"
-CLIENT_SECRET = os.environ.get("z7FpwnFB_FSo2c3yjZmGBB3JpxhUde7V")
+CLIENT_SECRET = "z7FpwnFB_FSo2c3yjZmGBB3JpxhUde7V"
 REDIRECT_URI = "http://localhost:3000/auth/callback"
 
 
