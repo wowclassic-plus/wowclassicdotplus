@@ -1,8 +1,8 @@
 import React from "react";
 import SurveyForm from "./SurveyForm";
 
-function SurveyPage() {
-  const backendUrl = "https://classic-plus-site.onrender.com";
+function SurveyPage({ backendUrl }) {
+  
   return (
     <div style={{ padding: "50px", textAlign: "center" }}>
       <h1>Survey</h1>
