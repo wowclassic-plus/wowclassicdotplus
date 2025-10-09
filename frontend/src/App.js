@@ -9,7 +9,7 @@ import PinsList from "./components/PinList";
 import DiscordCallback from "./components/DiscordCallback"; // we’ll create this
 import { UserProvider } from "./components/UserContext";
 
-const backendUrl = "https://classic-plus-site.onrender.com/auth/callback"
+const backendUrl = "https://classic-plus-site.onrender.com/"
 
 function App() {
   return (
@@ -23,7 +23,7 @@ function App() {
           <Route path="/results" element={<SurveyResults backendUrl={backendUrl} />} />
           <Route path="/map" element={<CustomMap backendUrl={backendUrl} />} />
           <Route path="/pins" element={<PinsList backendUrl={backendUrl} />} />
-          <Route path="/auth/callback" element={<DiscordCallback />} />
+          <Route path="/auth/callback" element={<DiscordCallback backendUrl={backendUrl}/>} />
         </Routes>
       </Router>
     </UserProvider>
