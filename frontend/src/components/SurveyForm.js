@@ -1,64 +1,7 @@
 import React, { useState } from "react";
 import Form from "@rjsf/core";
 import Ajv8Validator from "@rjsf/validator-ajv8";
-
-// Schema sections
-const schemaSections = {
-  Lore: {
-    title: "Lore",
-    properties: {
-      name: { type: "string", title: "Name / Character" },
-      previous_versions: {
-        type: "array",
-        title: "What versions of Classic have you played before?",
-        items: {
-          type: "string",
-          enum: ["Hardcore", "SoD", "SoM", "Vanilla", "TBC", "WoTLK", "Cata", "MoP"],
-        },
-        uniqueItems: true,
-      },
-    },
-    required: ["name", "previous_versions"],
-  },
-  Quests: {
-    title: "Quests",
-    properties: {
-      scaling_raids: {
-        type: "string",
-        title: "Do you think Classic Plus should have scaling difficulty levels in raids?",
-        enum: ["Yes", "No"],
-      },
-    },
-    required: ["scaling_raids"],
-  },
-  Raids: {
-    title: "Raids",
-    properties: {
-      new_race_class: {
-        type: "string",
-        title: "Do you think Classic Plus should have new race/class combinations?",
-        enum: ["Yes", "No"],
-      },
-    },
-    required: ["new_race_class"],
-  },
-  Dungeons: {
-    title: "Dungeons",
-    properties: {
-      currently_play: { type: "string", title: "Do you currently play Classic?", enum: ["Yes", "No"] },
-      intend_to_play: { type: "string", title: "Would you intend to play Classic Plus?", enum: ["Yes", "No"] },
-    },
-    required: ["currently_play", "intend_to_play"],
-  },
-};
-
-// Section colors
-const sectionColors = {
-  Lore: "#FFF9E6",
-  Quests: "#E6F7FF",
-  Raids: "#F0E6FF",
-  Dungeons: "#E6FFE6",
-};
+import { schemaSections, uiSchemas, sectionColors } from "./SurveySchema";
 
 // Custom field wrapper
 function FieldBox({ label, required, children }) {
@@ -83,13 +26,43 @@ function FieldBox({ label, required, children }) {
   );
 }
 
-// Collapsible section with progress
+// Custom Checkboxes widget for table/grid layout
+function CheckboxesGridWidget({ options, value, onChange }) {
+  const { enumOptions } = options;
+
+  const handleToggle = (itemValue) => {
+    if (value?.includes(itemValue)) {
+      onChange(value.filter(v => v !== itemValue));
+    } else {
+      onChange([...(value || []), itemValue]);
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 5 }}>
+      {enumOptions.map((opt, i) => (
+        <label key={i} 
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={value?.includes(opt.value) || false}
+            onChange={() => handleToggle(opt.value)}
+            style={{ marginRight: 5 }}
+          />
+          {opt.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Collapsible section with progress bar
 function CollapsibleSection({ title, schema, uiSchema, formData, onChange }) {
   const [collapsed, setCollapsed] = useState(false);
   const sectionColor = sectionColors[title] || "#f5f5f5";
 
   const allKeys = Object.keys(schema.properties);
-  const answeredCount = allKeys.filter((k) => formData[k] !== undefined && formData[k] !== "").length;
+  const answeredCount = allKeys.filter(k => formData[k] !== undefined && formData[k] !== "").length;
   const totalCount = allKeys.length;
   const progressPercent = Math.round((answeredCount / totalCount) * 100);
 
@@ -125,7 +98,7 @@ function CollapsibleSection({ title, schema, uiSchema, formData, onChange }) {
             borderRadius: 5,
             transition: "width 0.3s",
           }}
-        ></div>
+        />
       </div>
 
       {!collapsed && (
@@ -135,32 +108,23 @@ function CollapsibleSection({ title, schema, uiSchema, formData, onChange }) {
           validator={Ajv8Validator}
           FieldTemplate={FieldBox}
           formData={formData}
-          onChange={(e) => onChange({ ...formData, ...e.formData })}
+          onChange={e => onChange({ ...formData, ...e.formData })}
           showErrorList={false}
-        >
-          {/* Pass null so the default submit button is not rendered */}
-          {() => null}
-        </Form>
+          children={() => null} // REMOVE default submit
+          widgets={{ CheckboxesWidget: CheckboxesGridWidget }} // custom grid widget
+        />
       )}
     </div>
   );
 }
 
-// Full survey component
+// Main SurveyForm
 export default function SurveyForm({ backendUrl }) {
+  const [formData, setFormData] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
-  const [formData, setFormData] = useState({});
 
-  // UI schemas
-  const uiSchemas = {
-    Lore: { previous_versions: { "ui:widget": "checkboxes", "ui:options": { inline: false } } },
-    Quests: { scaling_raids: { "ui:widget": "radio" } },
-    Raids: { new_race_class: { "ui:widget": "radio" } },
-    Dungeons: { currently_play: { "ui:widget": "radio" }, intend_to_play: { "ui:widget": "radio" } },
-  };
-
-  // Validate required fields in all sections
+  // Check all required fields
   const validateAll = () => {
     for (let sectionName in schemaSections) {
       const req = schemaSections[sectionName].required || [];
@@ -194,8 +158,7 @@ export default function SurveyForm({ backendUrl }) {
     }
   };
 
-  if (submitted)
-    return <h2 style={{ color: "#222" }}>Thank you for your feedback!</h2>;
+  if (submitted) return <h2 style={{ color: "#222" }}>Thank you for your feedback!</h2>;
 
   return (
     <div style={{ backgroundColor: "#f7f7f7", minHeight: "100vh", padding: 40 }}>
@@ -209,35 +172,31 @@ export default function SurveyForm({ backendUrl }) {
           boxShadow: "0 0 15px rgba(0,0,0,0.1)",
         }}
       >
-        {Object.keys(schemaSections).map((section, index, arr) => (
-          <div key={section}>
-            <CollapsibleSection
-              title={section}
-              schema={schemaSections[section]}
-              uiSchema={uiSchemas[section] || {}}
-              formData={formData}
-              onChange={setFormData}
-              children={null}
-            />
-
-            {/* Only show submit on the last section */}
-            {index === arr.length - 1 && (
-              <button
-                onClick={handleSubmit}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: 5,
-                  border: "1px solid #000",
-                  backgroundColor: "#666",
-                  color: "white",
-                  cursor: "pointer",
-                }}
-              >
-                Submit
-              </button>
-            )}
-          </div>
+        {Object.keys(schemaSections).map(section => (
+          <CollapsibleSection
+            key={section}
+            title={section}
+            schema={schemaSections[section]}
+            uiSchema={uiSchemas[section] || {}}
+            formData={formData}
+            onChange={setFormData}
+          />
         ))}
+
+        <button
+          onClick={handleSubmit}
+          style={{
+            padding: "10px 20px",
+            borderRadius: 5,
+            border: "1px solid #000",
+            backgroundColor: "#666",
+            color: "white",
+            cursor: "pointer",
+            marginTop: 20,
+          }}
+        >
+          Submit
+        </button>
 
         {error && <p style={{ color: "red", marginTop: 10 }}>{error}</p>}
       </div>
