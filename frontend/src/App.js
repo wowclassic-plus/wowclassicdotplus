@@ -23,7 +23,7 @@ function App() {
           <Route path="/results" element={<SurveyResults backendUrl={backendUrl} />} />
           <Route path="/map" element={<CustomMap backendUrl={backendUrl} />} />
           <Route path="/pins" element={<PinsList backendUrl={backendUrl} />} />
-          <Route path="/auth/callback" element={<DiscordCallback backendUrl={backendUrl}/>} />
+          <Route path="/auth/callback" element={<DiscordCallback backendUrl={backendUrl} />} />
         </Routes>
       </Router>
     </UserProvider>

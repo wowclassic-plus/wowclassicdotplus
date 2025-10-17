@@ -25,7 +25,7 @@ export default function DiscordCallback({ backendUrl }) {
     } else {
         navigate("/home");
     }
-    }, [login, navigate]); // ✅ remove 'code' from dependencies
+    }, [login, navigate, backendUrl]); // ✅ remove 'code' from dependencies
 
 
   return <div>Logging in...</div>;
