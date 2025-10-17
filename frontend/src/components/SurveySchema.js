@@ -1,8 +1,8 @@
 // surveySchema.js
 
 export const schemaSections = {
-  Lore: {
-    title: "Lore",
+  'General Questions': {
+    title: "General",
     properties: {
       name: { type: "string", title: "Name / Character" },
       previous_versions: {
@@ -14,26 +14,26 @@ export const schemaSections = {
         },
         uniqueItems: true,
       },
-      new_lore: { type: "string", title: "Do you think Classic Plus should new Lore added?", enum: ["Yes", "No"] },
     },
-    required: ["name", "previous_versions","new_lore"],
+    required: ["name", "previous_versions"],
   },
-  Quests: {
-    title: "Quests",
+  'Player Questions': {
+    title: "Players",
     properties: {
       scaling_raids: { type: "string", title: "Do you think Classic Plus should have scaling difficulty levels in raids?", enum: ["Yes", "No"] },
+      scaling_raids2: { type: "string", title: "Do you think Classic Plus should have scaling difficulty levels in raids2?", enum: ["Yes", "No"] },
     },
-    required: ["scaling_raids"],
+    required: ["scaling_raids","scaling_raids2"],
   },
-  Raids: {
-    title: "Raids",
+  'Systems Questions': {
+    title: "Systems",
     properties: {
       new_race_class: { type: "string", title: "Do you think Classic Plus should have new race/class combinations?", enum: ["Yes", "No"] },
     },
     required: ["new_race_class"],
   },
-  Dungeons: {
-    title: "Dungeons",
+  'World Questions': {
+    title: "World",
     properties: {
       currently_play: { type: "string", title: "Do you currently play Classic?", enum: ["Yes", "No"] },
       intend_to_play: { type: "string", title: "Would you intend to play Classic Plus?", enum: ["Yes", "No"] },
@@ -43,20 +43,20 @@ export const schemaSections = {
 };
 
 export const uiSchemas = {
-  Lore: {
+  'General Questions': {
     previous_versions: {
       "ui:widget": "checkboxes",
       "ui:options": { inline: false, grid: true }, // custom rendering in table/grid
     },
   },
-  Quests: { scaling_raids: { "ui:widget": "radio" } },
-  Raids: { new_race_class: { "ui:widget": "radio" } },
-  Dungeons: { currently_play: { "ui:widget": "radio" }, intend_to_play: { "ui:widget": "radio" } },
+  'Player Questions': { scaling_raids: { "ui:widget": "radio" }, scaling_raids2: { "ui:widget": "radio" } },
+  'Systems Questions': { new_race_class: { "ui:widget": "radio" } },
+  'World Questions': { currently_play: { "ui:widget": "radio" }, intend_to_play: { "ui:widget": "radio" } },
 };
 
 export const sectionColors = {
-  Lore: "#FFF9E6",
-  Quests: "#E6F7FF",
-  Raids: "#F0E6FF",
-  Dungeons: "#E6FFE6",
+  'General Questions': "#FFF9E6",
+  'Player Questions': "#E6F7FF",
+  'Systems Questions': "#F0E6FF",
+  'World Questions': "#E6FFE6",
 };

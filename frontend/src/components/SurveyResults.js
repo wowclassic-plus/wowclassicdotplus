@@ -1,91 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import SurveySummary from "./SurveySummary"; // the chart component we'll define
 
-function SurveyResults({ backendUrl }) {
-  const [entries, setEntries] = useState([]);
+export default function SurveyResultsPage({ backendUrl }) {
+  const [surveyData, setSurveyData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${backendUrl}/survey/`)
-      .then((res) => res.json())
-      .then((data) => setEntries(data))
-      .catch((err) => console.error("Error fetching survey results:", err));
+    async function fetchData() {
+      try {
+        const res = await fetch(`${backendUrl}/survey/results/`);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        setSurveyData(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, [backendUrl]);
 
-  if (entries.length === 0)
-    return (
-      <p style={{ textAlign: "center", color: "white" }}>
-        No survey entries yet.
-      </p>
-    );
+  if (loading) return <p style={{ textAlign: "center", marginTop: 50 }}>Loading...</p>;
+  if (error) return <p style={{ textAlign: "center", marginTop: 50, color: "red" }}>Error: {error}</p>;
 
-  return (
-    <div
-      style={{
-        maxWidth: "900px",
-        margin: "40px auto",
-        padding: "20px",
-        backgroundColor: "#222",
-        color: "white",
-        borderRadius: "10px",
-      }}
-    >
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-        Survey Results
-      </h2>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          backgroundColor: "#333",
-          border: "1px solid black",
-        }}
-      >
-        <thead style={{ backgroundColor: "#444" }}>
-          <tr>
-            <th style={{ border: "1px solid black", padding: "10px" }}>Name</th>
-            <th style={{ border: "1px solid black", padding: "10px" }}>
-              Previous Versions
-            </th>
-            <th style={{ border: "1px solid black", padding: "10px" }}>
-              Scaling Raids
-            </th>
-            <th style={{ border: "1px solid black", padding: "10px" }}>
-              New Race/Class
-            </th>
-            <th style={{ border: "1px solid black", padding: "10px" }}>
-              Currently Play
-            </th>
-            <th style={{ border: "1px solid black", padding: "10px" }}>
-              Intend to Play
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry, idx) => (
-            <tr key={idx} style={{ backgroundColor: idx % 2 ? "#2a2a2a" : "#333" }}>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.name}
-              </td>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.previous_versions?.join(", ")}
-              </td>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.scaling_raids}
-              </td>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.new_race_class}
-              </td>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.currently_play}
-              </td>
-              <td style={{ border: "1px solid black", padding: "8px" }}>
-                {entry.intend_to_play}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <SurveySummary surveyData={surveyData} />;
 }
-
-export default SurveyResults;
