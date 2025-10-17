@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine, Base
 from pydantic import BaseModel
 from typing import List
-
+from collections import Counter
+from fastapi.responses import JSONResponse
 from sqlalchemy import Column, Integer, String
 
 router = APIRouter(
@@ -84,3 +85,41 @@ def get_survey_entries(db: Session = Depends(get_db)):
             )
         )
     return results
+
+
+@router.get("/results/")
+def get_survey_results(db: Session = Depends(get_db)):
+    """
+    Aggregate survey responses per question.
+    Returns a dictionary of question -> { answer -> count }
+    """
+    entries = db.query(SurveyEntry).all()
+
+    if not entries:
+        return JSONResponse(content={}, status_code=200)
+
+    # Initialize counters for each question
+    agg = {
+        "previous_versions": Counter(),
+        "scaling_raids": Counter(),
+        "new_race_class": Counter(),
+        "currently_play": Counter(),
+        "intend_to_play": Counter()
+    }
+
+    for entry in entries:
+        # previous_versions is a list stored as comma-separated string
+        if entry.previous_versions:
+            for item in entry.previous_versions.split(","):
+                agg["previous_versions"][item.strip()] += 1
+
+        # other string fields
+        for field in ["scaling_raids", "new_race_class", "currently_play", "intend_to_play"]:
+            value = getattr(entry, field)
+            if value:
+                agg[field][value.strip()] += 1
+
+    # Convert Counters to regular dicts for JSON serialization
+    agg_serializable = {q: dict(counts) for q, counts in agg.items()}
+
+    return agg_serializable
