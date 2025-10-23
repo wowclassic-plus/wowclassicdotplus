@@ -37,7 +37,6 @@ class Vote(Base):
     id = Column(Integer, primary_key=True, index=True)
     pin_id = Column(Integer, ForeignKey("pins.id"))
     discord_username  = Column(String, nullable=False)
-    ip = Column(String, nullable=False)
     vote_type = Column(String)  # 'up' or 'down'
 
     pin = relationship("Pin", back_populates="votes")
