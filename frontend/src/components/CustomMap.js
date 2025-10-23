@@ -151,7 +151,8 @@ export default function CustomMap({ backendUrl }) {
   const [newPinName, setNewPinName] = useState("");
   const [newPinCategory, setNewPinCategory] = useState("Lore");
   const [selectedRegion, setSelectedRegion] = useState("");
-  const { discordUser } = useContext(UserContext);
+  const { user: discordUser } = useContext(UserContext); // <-- use context
+
   const [selectedCategories, setSelectedCategories] = useState([
     "Lore",
     "Quest",
