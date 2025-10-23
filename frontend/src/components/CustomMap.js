@@ -286,7 +286,7 @@ export default function CustomMap({ backendUrl }) {
     try {
       const payload = {
         pin_id: pinId,
-        session_id: discordUser.username,
+        discord_username: discordUser.username,
         vote_type: type,
       };
       const res = await fetch(`${backendUrl}/pins/vote`, {
