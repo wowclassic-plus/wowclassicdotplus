@@ -69,7 +69,7 @@ const markerIcons = {
   }),
 };
 
-// Add pin on double click
+// Double-click to add pin
 function AddPinOnClick({ setNewPinCoords }) {
   useMapEvents({
     dblclick(e) {
@@ -86,12 +86,14 @@ function ZoomToRegion({ polygons, selectedRegion, imageBounds }) {
 
   useEffect(() => {
     if (selectedRegion === lastRegion) return;
+
     if (!selectedRegion) {
       map.fitBounds(imageBounds);
     } else {
       const poly = polygons.find((p) => p.name === selectedRegion);
       if (poly) map.fitBounds(L.latLngBounds(poly.coords));
     }
+
     setLastRegion(selectedRegion);
   }, [selectedRegion, lastRegion, polygons, imageBounds, map]);
 
@@ -110,7 +112,6 @@ function PanToPin() {
   return null;
 }
 
-// Reset button
 function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCategories }) {
   const map = useMap();
   const handleReset = () => {
@@ -118,6 +119,7 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
     setSelectedRegion("");
     setSelectedCategories([...allCategories]);
   };
+
   return (
     <div
       style={{
@@ -140,8 +142,13 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
   );
 }
 
-// Main Map Component
-export default function CustomMap({ backendUrl, discordUser }) {
+export default function CustomMap({ backendUrl }) {
+  // Discord user state (from localStorage)
+  const [discordUser] = useState(() => {
+    const stored = localStorage.getItem("discordUser");
+    return stored ? JSON.parse(stored) : null;
+  });
+
   const [pins, setPins] = useState([]);
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [newPinDesc, setNewPinDesc] = useState("");
@@ -205,28 +212,31 @@ export default function CustomMap({ backendUrl, discordUser }) {
 
   // Fetch pins and votes
   useEffect(() => {
-    if (!discordUser) return; // wait for login
     const fetchPins = async () => {
       try {
         const res = await fetch(`${backendUrl}/pins/`);
         const data = await res.json();
-        setPins(data.map((p) => ({
-          ...p,
-          polygon: getPolygonName(p),
-          upvotes: p.upvotes || 0,
-          downvotes: p.downvotes || 0,
-        })));
+        setPins(
+          data.map((p) => ({
+            ...p,
+            polygon: getPolygonName(p),
+            upvotes: p.upvotes || 0,
+            downvotes: p.downvotes || 0,
+          }))
+        );
 
-        // Fetch votes for logged-in Discord user
-        const voteRes = await fetch(`${backendUrl}/pins/votes/${discordUser.username}`);
-        const votes = await voteRes.json();
-        const voteMap = {};
-        votes.forEach((v) => voteMap[v.pin_id] = v.vote_type);
-        setVotedPins(voteMap);
+        if (discordUser) {
+          const voteRes = await fetch(`${backendUrl}/pins/votes/${discordUser.username}`);
+          const votes = await voteRes.json();
+          const voteMap = {};
+          votes.forEach((v) => (voteMap[v.pin_id] = v.vote_type));
+          setVotedPins(voteMap);
+        }
       } catch (err) {
         console.error(err);
       }
     };
+
     fetchPins();
     const interval = setInterval(fetchPins, 5000);
     return () => clearInterval(interval);
@@ -269,6 +279,7 @@ export default function CustomMap({ backendUrl, discordUser }) {
       alert("You must be logged in with Discord to vote.");
       return;
     }
+
     const pin = pins.find((p) => p.id === pinId);
     if (!pin) return;
 
@@ -328,7 +339,6 @@ export default function CustomMap({ backendUrl, discordUser }) {
               allCategories={allCategories}
             />
 
-            {/* Polygons */}
             {polygons.map((poly, idx) => (
               <Polygon
                 key={idx}
@@ -337,7 +347,6 @@ export default function CustomMap({ backendUrl, discordUser }) {
               />
             ))}
 
-            {/* Pins */}
             {filteredPins.map((pin) => (
               <Marker
                 key={pin.id}
@@ -354,7 +363,6 @@ export default function CustomMap({ backendUrl, discordUser }) {
               </Marker>
             ))}
 
-            {/* New Pin */}
             {newPinCoords && (
               <Marker position={newPinCoords}>
                 <Popup>
@@ -452,34 +460,37 @@ export default function CustomMap({ backendUrl, discordUser }) {
                   <div>Desc: {pin.description}</div>
                   <div>Zone: {getPolygonName(pin) || "N/A"}</div>
                 </div>
-                <div style={{ marginTop: 8, display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => votePin(pin.id, "up")}
-                    disabled={votedPins[pin.id] === "up"}
-                    style={{
-                      background: votedPins[pin.id] === "up" ? "green" : "",
-                      color: votedPins[pin.id] === "up" ? "white" : "",
-                      padding: "5px 10px",
-                      borderRadius: "3px",
-                      cursor: votedPins[pin.id] === "up" ? "default" : "pointer",
-                    }}
-                  >
-                    👍 {pin.upvotes}
-                  </button>
-                  <button
-                    onClick={() => votePin(pin.id, "down")}
-                    disabled={votedPins[pin.id] === "down"}
-                    style={{
-                      background: votedPins[pin.id] === "down" ? "red" : "",
-                      color: votedPins[pin.id] === "down" ? "white" : "",
-                      padding: "5px 10px",
-                      borderRadius: "3px",
-                      cursor: votedPins[pin.id] === "down" ? "default" : "pointer",
-                    }}
-                  >
-                    👎 {pin.downvotes}
-                  </button>
-                </div>
+              <div style={{ marginTop: 8, display: "flex", gap: 5, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => votePin(pin.id, "up")}
+                  disabled={!discordUser || votedPins[pin.id] === "up"}
+                  title={!discordUser ? "Log in with Discord to vote" : ""}
+                  style={{
+                    background: votedPins[pin.id] === "up" ? "green" : !discordUser ? "#ccc" : "",
+                    color: votedPins[pin.id] === "up" || !discordUser ? "black" : "",
+                    padding: "5px 10px",
+                    borderRadius: "3px",
+                    cursor: !discordUser ? "not-allowed" : votedPins[pin.id] === "up" ? "default" : "pointer",
+                  }}
+                >
+                  👍 {pin.upvotes}
+                </button>
+                <button
+                  onClick={() => votePin(pin.id, "down")}
+                  disabled={!discordUser || votedPins[pin.id] === "down"}
+                  title={!discordUser ? "Log in with Discord to vote" : ""}
+                  style={{
+                    background: votedPins[pin.id] === "down" ? "red" : !discordUser ? "#ccc" : "",
+                    color: votedPins[pin.id] === "down" || !discordUser ? "black" : "",
+                    padding: "5px 10px",
+                    borderRadius: "3px",
+                    cursor: !discordUser ? "not-allowed" : votedPins[pin.id] === "down" ? "default" : "pointer",
+                  }}
+                >
+                  👎 {pin.downvotes}
+                </button>
+              </div>
+
               </div>
             ))
           )}
