@@ -36,13 +36,13 @@ class Vote(Base):
     __tablename__ = "votes"
     id = Column(Integer, primary_key=True, index=True)
     pin_id = Column(Integer, ForeignKey("pins.id"))
-    session_id = Column(String, nullable=False)
+    discord_username  = Column(String, nullable=False)
     ip = Column(String, nullable=False)
     vote_type = Column(String)  # 'up' or 'down'
 
     pin = relationship("Pin", back_populates="votes")
 
-    __table_args__ = (UniqueConstraint('pin_id', 'session_id', 'ip', name='_pin_session_ip_uc'),)
+    __table_args__ = (UniqueConstraint('pin_id', 'discord_username', name='_pin_discord_uc'),)
 
 
 Base.metadata.create_all(bind=engine)
@@ -89,7 +89,7 @@ def get_pins(db: Session = Depends(get_db)):
     return db.query(Pin).all()
 
 
-def vote_on_pin(db: Session, pin_id: int, session_id: str, ip: str, vote_type: str):
+def vote_on_pin(db: Session, pin_id: int, discord_username: str, vote_type: str):
     if vote_type not in ['up', 'down']:
         raise ValueError("Invalid vote type. Must be 'up' or 'down'.")
 
@@ -99,8 +99,7 @@ def vote_on_pin(db: Session, pin_id: int, session_id: str, ip: str, vote_type: s
 
     existing_vote = db.query(Vote).filter(
         Vote.pin_id == pin_id,
-        Vote.session_id == session_id,
-        Vote.ip == ip
+        Vote.discord_username == discord_username
     ).first()
 
     if existing_vote:
@@ -117,8 +116,8 @@ def vote_on_pin(db: Session, pin_id: int, session_id: str, ip: str, vote_type: s
                 pin.downvotes += 1
 
             existing_vote.vote_type = vote_type
-        # If vote_type is the same, we can optionally undo vote:
         else:
+            # Undo vote
             if vote_type == 'up':
                 pin.upvotes -= 1
             else:
@@ -126,7 +125,7 @@ def vote_on_pin(db: Session, pin_id: int, session_id: str, ip: str, vote_type: s
             db.delete(existing_vote)
     else:
         # New vote
-        new_vote = Vote(pin_id=pin_id, session_id=session_id, ip=ip, vote_type=vote_type)
+        new_vote = Vote(pin_id=pin_id, discord_username=discord_username, vote_type=vote_type)
         db.add(new_vote)
         if vote_type == 'up':
             pin.upvotes += 1
@@ -141,15 +140,13 @@ from fastapi import Request, HTTPException
 
 class VoteSchema(BaseModel):
     pin_id: int
-    session_id: str  # could be email, username, or session token
+    discord_username: str  # NEW: Discord username
     vote_type: str  # 'up' or 'down'
 
 @router.post("/vote")
-def vote_pin(vote: VoteSchema, request: Request, db: Session = Depends(get_db)):
-    client_ip = request.client.host  # get IP of user
-
+def vote_pin(vote: VoteSchema, db: Session = Depends(get_db)):
     try:
-        pin = vote_on_pin(db, vote.pin_id, vote.session_id, client_ip, vote.vote_type)
+        pin = vote_on_pin(db, vote.pin_id, vote.discord_username, vote.vote_type)
         return {
             "pin_id": pin.id,
             "upvotes": pin.upvotes,
@@ -157,9 +154,9 @@ def vote_pin(vote: VoteSchema, request: Request, db: Session = Depends(get_db)):
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
     
-@router.get("/votes/{session_id}")
-def get_votes(session_id: str, request: Request, db: Session = Depends(get_db)):
-    client_ip = request.client.host
-    votes = db.query(Vote).filter(Vote.session_id == session_id, Vote.ip == client_ip).all()
+@router.get("/votes/{discord_username}")
+def get_votes(discord_username: str, db: Session = Depends(get_db)):
+    votes = db.query(Vote).filter(Vote.discord_username == discord_username).all()
     return [{"pin_id": v.pin_id, "vote_type": v.vote_type} for v in votes]
