@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   MapContainer,
   ImageOverlay,
@@ -15,6 +15,7 @@ import PinForm from "./PinForm";
 import polygons from "./polygons";
 import * as turf from "@turf/turf";
 import "leaflet-draw/dist/leaflet.draw.css";
+import { UserContext } from "./UserContext";
 
 // Fix default Leaflet markers
 delete L.Icon.Default.prototype._getIconUrl;
@@ -143,11 +144,6 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
 }
 
 export default function CustomMap({ backendUrl }) {
-  // Discord user state (from localStorage)
-  const [discordUser] = useState(() => {
-    const stored = localStorage.getItem("discordUser");
-    return stored ? JSON.parse(stored) : null;
-  });
 
   const [pins, setPins] = useState([]);
   const [newPinCoords, setNewPinCoords] = useState(null);
@@ -155,6 +151,7 @@ export default function CustomMap({ backendUrl }) {
   const [newPinName, setNewPinName] = useState("");
   const [newPinCategory, setNewPinCategory] = useState("Lore");
   const [selectedRegion, setSelectedRegion] = useState("");
+  const { discordUser } = useContext(UserContext);
   const [selectedCategories, setSelectedCategories] = useState([
     "Lore",
     "Quest",
