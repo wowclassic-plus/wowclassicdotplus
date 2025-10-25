@@ -1,8 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
+load_dotenv() 
 
-SQLALCHEMY_DATABASE_URL = "postgresql://classicplusdb_user:yN2K3cUvje4HeleGmEPddRtcQYlJDsF4@dpg-d3dgc4qdbo4c73aruja0-a.virginia-postgres.render.com/classicplusdb"
+# Load from environment variables
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL

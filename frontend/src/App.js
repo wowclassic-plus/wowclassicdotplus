@@ -9,7 +9,7 @@ import PinsList from "./components/PinList";
 import DiscordCallback from "./components/DiscordCallback"; // we’ll create this
 import { UserProvider } from "./components/UserContext";
 
-const backendUrl = "https://classic-plus-site.onrender.com"
+const backendUrl = process.env.REACT_APP_BACKEND_URL
 
 function App() {
   return (

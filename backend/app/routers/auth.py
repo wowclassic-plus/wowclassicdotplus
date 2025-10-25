@@ -1,12 +1,15 @@
 # app/routers/auth.py
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 import requests
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter(prefix="/auth/discord", tags=["auth"])
 
-# Load from environment variables
+# Load environment variables
 CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
@@ -17,14 +20,14 @@ if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
     )
 
 @router.get("/callback")
-def discord_callback(code: str):
+def discord_callback(code: str = Query(..., description="OAuth2 code from Discord")):
     """
     Exchange the OAuth2 code for an access token, then fetch Discord user info.
     """
-    print("=== Discord Callback Triggered ===")
-    print("Received code:", code)
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing OAuth code")
 
-    # Token request
+    # Step 1: Exchange code for access token
     token_url = "https://discord.com/api/oauth2/token"
     data = {
         "client_id": CLIENT_ID,
@@ -36,36 +39,34 @@ def discord_callback(code: str):
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-    print("Sending token request to Discord...")
     token_resp = requests.post(token_url, data=data, headers=headers)
-    print("Token response status:", token_resp.status_code)
-    print("Token response body:", token_resp.text)
 
     if token_resp.status_code != 200:
-        raise HTTPException(
+        # Discord returns 400 for invalid or expired code
+        return JSONResponse(
             status_code=400,
-            detail=f"Failed to get token from Discord: {token_resp.json()}"
+            content={"error": "invalid_grant", "details": token_resp.json()}
         )
 
     access_token = token_resp.json().get("access_token")
     if not access_token:
-        raise HTTPException(status_code=400, detail="No access token returned by Discord")
+        return JSONResponse(
+            status_code=400,
+            content={"error": "no_access_token", "details": token_resp.json()}
+        )
 
-    # Fetch user info
+    # Step 2: Fetch user info
     user_resp = requests.get(
         "https://discord.com/api/users/@me",
         headers={"Authorization": f"Bearer {access_token}"}
     )
-    print("User info response status:", user_resp.status_code)
-    print("User info response body:", user_resp.text)
 
     if user_resp.status_code != 200:
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail=f"Failed to get user info from Discord: {user_resp.json()}"
+            content={"error": "failed_user_info", "details": user_resp.json()}
         )
 
     user_data = user_resp.json()
-    print("User data fetched:", user_data)
 
     return JSONResponse(content=user_data)

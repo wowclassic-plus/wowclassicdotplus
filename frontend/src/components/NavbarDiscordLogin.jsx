@@ -1,12 +1,15 @@
 import React, { useContext } from "react";
 import { UserContext } from "./UserContext";
 
-const CLIENT_ID = "1425731842442526733";
-const FRONTEND_REDIRECT = "https://classic-plus-site-frontend.onrender.com/auth/callback";
-
+const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID;
+const FRONTEND_REDIRECT = process.env.REACT_APP_FRONTEND_REDIRECT;
 
 export default function NavbarDiscordLogin() {
   const { user, logout } = useContext(UserContext);
+
+  if (!CLIENT_ID || !FRONTEND_REDIRECT) {
+    return null; // Do not render login button if misconfigured
+  }
 
   const handleLogin = () => {
     const OAUTH_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
@@ -16,24 +19,18 @@ export default function NavbarDiscordLogin() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "1vw", // relative gap
-      }}
-    >
+    <div style={{ display: "flex", alignItems: "center", gap: "1vw" }}>
       {!user ? (
         <button
           onClick={handleLogin}
           style={{
             backgroundColor: "#5865F2",
             color: "white",
-            padding: "0.6vw 1.2vw", // scales with viewport
+            padding: "0.6vw 1.2vw",
             border: "none",
             borderRadius: "0.6vw",
             fontWeight: "bold",
-            fontSize: "1vw", // responsive text
+            fontSize: "1vw",
             cursor: "pointer",
             transition: "transform 0.2s ease, box-shadow 0.3s ease",
           }}
@@ -54,7 +51,7 @@ export default function NavbarDiscordLogin() {
             display: "flex",
             alignItems: "center",
             gap: "0.8vw",
-            flexWrap: "wrap", // helps on mobile
+            flexWrap: "wrap",
           }}
         >
           <img
