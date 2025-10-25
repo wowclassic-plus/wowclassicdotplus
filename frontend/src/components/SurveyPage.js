@@ -5,8 +5,7 @@ function SurveyPage({ backendUrl }) {
   
   return (
     <div style={{ padding: "100px", textAlign: "center" }}>
-      <h1 style={{color:"white"}}>Survey</h1>
-      <p style={{color:"white"}}>We value your feedback! Please fill out the survey below.</p>
+      <h1 style={{color:"white"}}>Classic Plus Survey</h1>
       <SurveyForm backendUrl={backendUrl} />
     </div>
   );
