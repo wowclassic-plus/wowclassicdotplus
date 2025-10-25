@@ -148,7 +148,7 @@ export default function CustomMap({ backendUrl }) {
   const [newPinCategory, setNewPinCategory] = useState("Lore");
   const [selectedRegion, setSelectedRegion] = useState("");
   const { user: discordUser } = useContext(UserContext);
-
+  const [minUpvotes, setMinUpvotes] = useState(0); // default 0
   const [selectedCategories, setSelectedCategories] = useState(["Lore", "Quest", "Raid", "Dungeon"]);
   const [votedPins, setVotedPins] = useState({});
   const [showLoginPopup, setShowLoginPopup] = useState(false);
@@ -188,7 +188,9 @@ export default function CustomMap({ backendUrl }) {
   const filteredPins = pins
     .filter((pin) => selectedCategories.includes(pin.category))
     .filter((pin) => !selectedRegion || isPinInPolygon(pin, polygons.find((p) => p.name === selectedRegion)?.coords || []))
+    .filter((pin) => pin.upvotes >= minUpvotes) // <-- apply slider filter
     .sort((a, b) => b.upvotes - a.upvotes);
+    
 
   // Fetch pins and votes
   useEffect(() => {
@@ -313,6 +315,43 @@ export default function CustomMap({ backendUrl }) {
               setSelectedCategories={setSelectedCategories}
               allCategories={allCategories}
             />
+            <div style={{
+              position: "absolute",
+              top: 350,
+              left: 10,
+              zIndex: 1000,
+              background: "lightgray",
+              padding: "10px",
+              borderRadius: "8px",
+              width: 180,
+              fontWeight: "bold",
+              textAlign: "center"
+            }}>
+              <div style={{ marginBottom: 10, fontSize: 16 }}>Filter by Pin Popularity</div>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(...pins.map(p => p.upvotes), 50)}
+                value={minUpvotes}
+                onChange={(e) => setMinUpvotes(Number(e.target.value))}
+                style={{ width: "100%" }}
+                list="tickmarks"
+              />
+              {/* Tick labels */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 5,
+                fontSize: 14,
+                fontWeight: "bold"
+              }}>
+                <span>0</span>
+                <span>5</span>
+                <span>10</span>
+                <span>20</span>
+                <span>50+</span>
+              </div>
+            </div>
             {polygons.map((poly, idx) => (
               <Polygon
                 key={idx}
