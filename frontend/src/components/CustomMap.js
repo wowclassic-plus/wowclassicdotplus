@@ -14,7 +14,6 @@ import "leaflet/dist/leaflet.css";
 import PinForm from "./PinForm";
 import polygons from "./polygons";
 import * as turf from "@turf/turf";
-import "leaflet-draw/dist/leaflet.draw.css";
 import { UserContext } from "./UserContext";
 
 // Fix default Leaflet markers
@@ -87,14 +86,11 @@ function ZoomToRegion({ polygons, selectedRegion, imageBounds }) {
 
   useEffect(() => {
     if (selectedRegion === lastRegion) return;
-
-    if (!selectedRegion) {
-      map.fitBounds(imageBounds);
-    } else {
+    if (!selectedRegion) map.fitBounds(imageBounds);
+    else {
       const poly = polygons.find((p) => p.name === selectedRegion);
       if (poly) map.fitBounds(L.latLngBounds(poly.coords));
     }
-
     setLastRegion(selectedRegion);
   }, [selectedRegion, lastRegion, polygons, imageBounds, map]);
 
@@ -113,6 +109,7 @@ function PanToPin() {
   return null;
 }
 
+// Reset button
 function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCategories }) {
   const map = useMap();
   const handleReset = () => {
@@ -144,22 +141,17 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
 }
 
 export default function CustomMap({ backendUrl }) {
-
   const [pins, setPins] = useState([]);
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [newPinDesc, setNewPinDesc] = useState("");
   const [newPinName, setNewPinName] = useState("");
   const [newPinCategory, setNewPinCategory] = useState("Lore");
   const [selectedRegion, setSelectedRegion] = useState("");
-  const { user: discordUser } = useContext(UserContext); // <-- use context
+  const { user: discordUser } = useContext(UserContext);
 
-  const [selectedCategories, setSelectedCategories] = useState([
-    "Lore",
-    "Quest",
-    "Raid",
-    "Dungeon",
-  ]);
+  const [selectedCategories, setSelectedCategories] = useState(["Lore", "Quest", "Raid", "Dungeon"]);
   const [votedPins, setVotedPins] = useState({});
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
 
   const imageBounds = [
     [0, 0],
@@ -169,16 +161,11 @@ export default function CustomMap({ backendUrl }) {
 
   const getColor = (category) => {
     switch ((category || "").toLowerCase()) {
-      case "lore":
-        return "blue";
-      case "quest":
-        return "green";
-      case "raid":
-        return "red";
-      case "dungeon":
-        return "purple";
-      default:
-        return "gray";
+      case "lore": return "blue";
+      case "quest": return "green";
+      case "raid": return "red";
+      case "dungeon": return "purple";
+      default: return "gray";
     }
   };
 
@@ -199,13 +186,8 @@ export default function CustomMap({ backendUrl }) {
 
   // Filter pins
   const filteredPins = pins
-    .filter((pin) => {
-      if (!selectedCategories.includes(pin.category)) return false;
-      if (!selectedRegion) return true;
-      const poly = polygons.find((p) => p.name === selectedRegion);
-      if (!poly) return true;
-      return isPinInPolygon(pin, poly.coords);
-    })
+    .filter((pin) => selectedCategories.includes(pin.category))
+    .filter((pin) => !selectedRegion || isPinInPolygon(pin, polygons.find((p) => p.name === selectedRegion)?.coords || []))
     .sort((a, b) => b.upvotes - a.upvotes);
 
   // Fetch pins and votes
@@ -234,7 +216,6 @@ export default function CustomMap({ backendUrl }) {
         console.error(err);
       }
     };
-
     fetchPins();
     const interval = setInterval(fetchPins, 5000);
     return () => clearInterval(interval);
@@ -274,7 +255,7 @@ export default function CustomMap({ backendUrl }) {
   // Voting
   const votePin = async (pinId, type) => {
     if (!discordUser) {
-      alert("You must be logged in with Discord to vote.");
+      setShowLoginPopup(true);
       return;
     }
 
@@ -284,11 +265,7 @@ export default function CustomMap({ backendUrl }) {
     const currentVote = votedPins[pinId];
 
     try {
-      const payload = {
-        pin_id: pinId,
-        discord_username: discordUser.username,
-        vote_type: type,
-      };
+      const payload = { pin_id: pinId, discord_username: discordUser.username, vote_type: type };
       const res = await fetch(`${backendUrl}/pins/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -336,7 +313,6 @@ export default function CustomMap({ backendUrl }) {
               setSelectedCategories={setSelectedCategories}
               allCategories={allCategories}
             />
-
             {polygons.map((poly, idx) => (
               <Polygon
                 key={idx}
@@ -344,7 +320,6 @@ export default function CustomMap({ backendUrl }) {
                 pathOptions={{ color: "transparent", fillOpacity: 0, interactive: false }}
               />
             ))}
-
             {filteredPins.map((pin) => (
               <Marker
                 key={pin.id}
@@ -360,7 +335,6 @@ export default function CustomMap({ backendUrl }) {
                 </Popup>
               </Marker>
             ))}
-
             {newPinCoords && (
               <Marker position={newPinCoords}>
                 <Popup>
@@ -380,26 +354,12 @@ export default function CustomMap({ backendUrl }) {
           </MapContainer>
 
           {/* Filters */}
-          <div
-            style={{
-              position: "absolute",
-              top: 100,
-              left: 10,
-              zIndex: 1000,
-              background: "lightgray",
-              padding: "10px",
-              borderRadius: "8px",
-            }}
-          >
+          <div style={{ position: "absolute", top: 100, left: 10, zIndex: 1000, background: "lightgray", padding: "10px", borderRadius: "8px" }}>
             <strong>Region:</strong>
             <br />
             <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)}>
               <option value="">All</option>
-              {polygons.map((poly) => (
-                <option key={poly.name} value={poly.name}>
-                  {poly.name}
-                </option>
-              ))}
+              {polygons.map((poly) => <option key={poly.name} value={poly.name}>{poly.name}</option>)}
             </select>
             <br />
             <strong>Categories:</strong>
@@ -423,77 +383,99 @@ export default function CustomMap({ backendUrl }) {
         </div>
 
         {/* Right Panel: Pins List */}
-        <div
-          style={{
-            flex: 1,
-            top: 0,
-            position: "relative",
-            overflowY: "auto",
-            padding: 10,
-            borderLeft: "1px solid #000",
-            background: "lightgray",
-          }}
-        >
+        <div style={{ flex: 1, top: 0, position: "relative", overflowY: "auto", padding: 10, borderLeft: "1px solid #000", background: "lightgray" }}>
           <h3>Filtered Pins</h3>
           {filteredPins.length === 0 ? (
             <p>No pins</p>
           ) : (
             filteredPins.map((pin) => (
-              <div
-                key={pin.id}
-                style={{
-                  border: "1px solid #aaa",
-                  borderRadius: 8,
-                  padding: 10,
-                  marginBottom: 10,
-                  background: "white",
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                }}
-              >
+              <div key={pin.id} style={{ border: "1px solid #aaa", borderRadius: 8, padding: 10, marginBottom: 10, background: "white", boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }}>
                 <div style={{ fontWeight: "bold", fontSize: "1.1em" }}>
-                  {pin.name}{" "}
-                  <span style={{ color: "#666", fontSize: "0.9em" }}>({pin.category})</span>
+                  {pin.name} <span style={{ color: "#666", fontSize: "0.9em" }}>({pin.category})</span>
                 </div>
                 <div style={{ fontSize: "0.85em", marginTop: 5 }}>
                   <div>Desc: {pin.description}</div>
                   <div>Zone: {getPolygonName(pin) || "N/A"}</div>
                 </div>
-              <div style={{ marginTop: 8, display: "flex", gap: 5, flexWrap: "wrap" }}>
-                <button
-                  onClick={() => votePin(pin.id, "up")}
-                  disabled={!discordUser || votedPins[pin.id] === "up"}
-                  title={!discordUser ? "Log in with Discord to vote" : ""}
-                  style={{
-                    background: votedPins[pin.id] === "up" ? "green" : !discordUser ? "#ccc" : "",
-                    color: votedPins[pin.id] === "up" || !discordUser ? "black" : "",
-                    padding: "5px 10px",
-                    borderRadius: "3px",
-                    cursor: !discordUser ? "not-allowed" : votedPins[pin.id] === "up" ? "default" : "pointer",
-                  }}
-                >
-                  👍 {pin.upvotes}
-                </button>
-                <button
-                  onClick={() => votePin(pin.id, "down")}
-                  disabled={!discordUser || votedPins[pin.id] === "down"}
-                  title={!discordUser ? "Log in with Discord to vote" : ""}
-                  style={{
-                    background: votedPins[pin.id] === "down" ? "red" : !discordUser ? "#ccc" : "",
-                    color: votedPins[pin.id] === "down" || !discordUser ? "black" : "",
-                    padding: "5px 10px",
-                    borderRadius: "3px",
-                    cursor: !discordUser ? "not-allowed" : votedPins[pin.id] === "down" ? "default" : "pointer",
-                  }}
-                >
-                  👎 {pin.downvotes}
-                </button>
-              </div>
-
+                <div style={{ marginTop: 8, display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => votePin(pin.id, "up")}
+                    style={{
+                      background: votedPins[pin.id] === "up" ? "green" : "",
+                      color: votedPins[pin.id] === "up" ? "black" : "",
+                      padding: "5px 10px",
+                      borderRadius: "3px",
+                      cursor: votedPins[pin.id] === "up" ? "default" : "pointer",
+                    }}
+                  >
+                    👍 {pin.upvotes}
+                  </button>
+                  <button
+                    onClick={() => votePin(pin.id, "down")}
+                    style={{
+                      background: votedPins[pin.id] === "down" ? "red" : "",
+                      color: votedPins[pin.id] === "down" ? "black" : "",
+                      padding: "5px 10px",
+                      borderRadius: "3px",
+                      cursor: votedPins[pin.id] === "down" ? "default" : "pointer",
+                    }}
+                  >
+                    👎 {pin.downvotes}
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Login Popup */}
+      {showLoginPopup && (
+        <div
+          onClick={() => setShowLoginPopup(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: "#ecececff",
+              color: "#000",
+              padding: "15px",
+              borderRadius: "8px",
+              maxWidth: "20%",
+              textAlign: "center",
+            }}
+          >
+            <p><strong>You must be logged in with Discord to vote.</strong></p>
+            <button
+              onClick={() => setShowLoginPopup(false)}
+              style={{
+                marginTop: "3px",
+                padding: "6px 6px",
+                borderRadius: "5px",
+                border: "none",
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

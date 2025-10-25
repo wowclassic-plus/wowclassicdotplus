@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import * as turf from "@turf/turf";
 import polygons from "./polygons";
+import { UserContext } from "./UserContext";
 
 let sessionId = sessionStorage.getItem("session_id");
 if (!sessionId) {
@@ -9,7 +10,7 @@ if (!sessionId) {
   sessionStorage.setItem("session_id", sessionId);
 }
 
-// --- Category color map ---
+// Category color map
 const CATEGORY_COLORS = {
   lore: "#3b82f6",
   quest: "#22c55e",
@@ -19,12 +20,22 @@ const CATEGORY_COLORS = {
 };
 
 function PinsList({ backendUrl }) {
+  const { user: discordUser } = useContext(UserContext);
   const [pins, setPins] = useState([]);
   const [filters, setFilters] = useState({ description: "", categories: [], polygon: "" });
   const [votedPins, setVotedPins] = useState({});
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
   const navigate = useNavigate();
 
-  // --- Load pins and votes ---
+  const getPolygonName = (pin) => {
+    const point = turf.point([pin.y, pin.x]);
+    for (const poly of polygons) {
+      const polygon = turf.polygon([poly.coords.map(([lat, lng]) => [lng, lat])]);
+      if (turf.booleanPointInPolygon(point, polygon)) return poly.name;
+    }
+    return null;
+  };
+
   useEffect(() => {
     const fetchPins = async () => {
       try {
@@ -37,10 +48,10 @@ function PinsList({ backendUrl }) {
           upvotes: pin.upvotes || 0,
           downvotes: pin.downvotes || 0,
         }));
-
         setPins(enriched);
 
-        const voteRes = await fetch(`${backendUrl}/pins/votes/${sessionId}`);
+        const voterId = discordUser?.username || sessionId;
+        const voteRes = await fetch(`${backendUrl}/pins/votes/${voterId}`);
         const votes = await voteRes.json();
         const voteMap = {};
         votes.forEach((v) => (voteMap[v.pin_id] = v.vote_type));
@@ -53,42 +64,41 @@ function PinsList({ backendUrl }) {
     fetchPins();
     const interval = setInterval(fetchPins, 5000);
     return () => clearInterval(interval);
-  }, [backendUrl]);
-
-  // --- Helper: determine polygon for each pin ---
-  const getPolygonName = (pin) => {
-    const point = turf.point([pin.y, pin.x]);
-    for (const poly of polygons) {
-      const polygon = turf.polygon([poly.coords.map(([lat, lng]) => [lng, lat])]);
-      if (turf.booleanPointInPolygon(point, polygon)) return poly.name;
-    }
-    return null;
-  };
+  }, [backendUrl, discordUser]);
 
   const goToMap = (pin) => navigate("/map", { state: { lat: pin.x, lng: pin.y } });
 
-  // --- Voting ---
   const votePin = async (pinId, type) => {
+    if (!discordUser) {
+      setShowLoginPopup(true);
+      return;
+    }
+
     const pin = pins.find((p) => p.id === pinId);
     if (!pin) return;
 
     const currentVote = votedPins[pinId];
-    let updatedPin = { ...pin };
 
     try {
-      const payload = { pin_id: pinId, session_id: sessionId, vote_type: type };
+      const payload = {
+        pin_id: pinId,
+        discord_username: discordUser?.username,
+        session_id: !discordUser ? sessionId : undefined,
+        vote_type: type,
+      };
       const res = await fetch(`${backendUrl}/pins/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) throw new Error("Vote failed");
 
       const updated = await res.json();
-      updatedPin = { ...pin, upvotes: updated.upvotes, downvotes: updated.downvotes };
-
-      setPins((prev) => prev.map((p) => (p.id === pinId ? updatedPin : p)));
+      setPins((prev) =>
+        prev.map((p) =>
+          p.id === pinId ? { ...p, upvotes: updated.upvotes, downvotes: updated.downvotes } : p
+        )
+      );
 
       setVotedPins((prev) => {
         const newVotes = { ...prev };
@@ -101,7 +111,6 @@ function PinsList({ backendUrl }) {
     }
   };
 
-  // --- Unique category list ---
   const categories = useMemo(
     () => [...new Set(pins.map((p) => p.category).filter(Boolean))],
     [pins]
@@ -116,7 +125,6 @@ function PinsList({ backendUrl }) {
     });
   };
 
-  // --- Filter + sort (highest upvotes first) ---
   const filteredPins = useMemo(() => {
     return pins
       .filter((pin) => {
@@ -136,44 +144,12 @@ function PinsList({ backendUrl }) {
       .sort((a, b) => b.upvotes - a.upvotes);
   }, [pins, filters]);
 
-  // --- Styles ---
-  const containerStyle = {
-    maxWidth: "900px",
-    margin: "80px auto",
-    padding: "0 20px",
-    color: "#000000ff",
-    backgroundColor: "#0e0e0eff",
-    fontFamily: "system-ui, sans-serif",
-  };
-
-  const cardBaseStyle = {
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    borderRadius: "10px",
-    padding: "16px",
-    marginBottom: "18px",
-    backgroundColor: "#2d2d2d",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-    transition: "transform 0.2s ease, box-shadow 0.2s ease",
-  };
-
   return (
-    <div style={containerStyle}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px", color: "#f8fafc" }}>
-        All Pins
-      </h2>
+    <div style={{ maxWidth: "900px", margin: "80px auto", padding: "0 20px", backgroundColor: "#949494", minHeight: "100vh", color: "#fff" }}>
+      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>All Pins</h2>
 
       {/* Filters */}
-      <div
-        style={{
-          marginBottom: "25px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "10px",
-        }}
-      >
+      <div style={{ marginBottom: "25px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
         <input
           placeholder="Search description..."
           value={filters.description}
@@ -182,15 +158,14 @@ function PinsList({ backendUrl }) {
             padding: "8px",
             borderRadius: "5px",
             border: "1px solid #555",
-            backgroundColor: "#333",
-            color: "#f1f5f9",
+            backgroundColor: "#fff",
+            color: "#000",
             width: "60%",
           }}
         />
-
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
           {categories.map((cat) => (
-            <label key={cat} style={{ color: "#ddd", textTransform: "capitalize" }}>
+            <label key={cat} style={{ color: "#fff", textTransform: "capitalize" }}>
               <input
                 type="checkbox"
                 checked={filters.categories.includes(cat)}
@@ -208,8 +183,8 @@ function PinsList({ backendUrl }) {
             padding: "8px",
             borderRadius: "5px",
             border: "1px solid #555",
-            backgroundColor: "#333",
-            color: "#f1f5f9",
+            backgroundColor: "#fff",
+            color: "#000",
             width: "200px",
           }}
         >
@@ -222,76 +197,59 @@ function PinsList({ backendUrl }) {
         </select>
       </div>
 
-      {/* Forum-style pins */}
+      {/* Pins List */}
       {filteredPins.map((pin) => {
-        const catColor =
-          CATEGORY_COLORS[pin.category?.toLowerCase()] || CATEGORY_COLORS.other;
+        const catColor = CATEGORY_COLORS[pin.category?.toLowerCase()] || CATEGORY_COLORS.other;
 
         return (
           <div
             key={pin.id}
             style={{
-              ...cardBaseStyle,
+              display: "flex",
+              alignItems: "flex-start",
+              marginBottom: "18px",
+              backgroundColor: "#fff",
+              borderRadius: "10px",
+              padding: "16px",
               borderLeft: `8px solid ${catColor}`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.01)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+              color: "#000",
             }}
           >
-            {/* Left column: votes */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginRight: "16px",
-                color: "#e2e8f0",
-                minWidth: "50px",
-              }}
-            >
+            {/* Voting */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginRight: "16px", minWidth: "50px" }}>
               <button
                 onClick={() => votePin(pin.id, "up")}
-                disabled={votedPins[pin.id] === "up"}
                 style={{
-                  background: "none",
-                  border: "none",
-                  color: votedPins[pin.id] === "up" ? "#4ade80" : "#94a3b8",
-                  fontSize: "20px",
+                  background: votedPins[pin.id] === "up" ? "green" : "",
+                  color: votedPins[pin.id] === "up" ? "#000" : "#000",
+                  padding: "5px 10px",
+                  borderRadius: "3px",
                   cursor: "pointer",
                 }}
               >
-                ▲
+                👍 {pin.upvotes}
               </button>
-              <div style={{ fontWeight: "bold", fontSize: "16px" }}>
-                {pin.upvotes - pin.downvotes}
-              </div>
               <button
                 onClick={() => votePin(pin.id, "down")}
-                disabled={votedPins[pin.id] === "down"}
                 style={{
-                  background: "none",
-                  border: "none",
-                  color: votedPins[pin.id] === "down" ? "#f87171" : "#94a3b8",
-                  fontSize: "20px",
+                  background: votedPins[pin.id] === "down" ? "red" : "",
+                  color: votedPins[pin.id] === "down" ? "#000" : "#000",
+                  padding: "5px 10px",
+                  borderRadius: "3px",
                   cursor: "pointer",
                 }}
               >
-                ▼
+                👎 {pin.downvotes}
               </button>
             </div>
 
-            {/* Right column: content */}
+            {/* Content */}
             <div style={{ flex: 1 }}>
               <div style={{ marginBottom: "8px" }}>
                 <span
                   style={{
                     backgroundColor: catColor,
-                    color: "white",
+                    color: "#fff",
                     borderRadius: "6px",
                     padding: "2px 8px",
                     fontSize: "12px",
@@ -301,16 +259,10 @@ function PinsList({ backendUrl }) {
                 >
                   {pin.category || "Other"}
                 </span>
-                <span style={{ color: "#9ca3af" }}>
-                  Zone: {pin.polygon || "Unassigned"}
-                </span>
+                <span style={{ color: "#555" }}>Zone: {pin.polygon || "Unassigned"}</span>
               </div>
-
-              <h3 style={{ margin: "4px 0", color: "#f1f5f9" }}>{pin.name}</h3>
-              <p style={{ color: "#cbd5e1", marginBottom: "8px" }}>
-                {pin.description}
-              </p>
-
+              <h3 style={{ margin: "4px 0" }}>{pin.name}</h3>
+              <p style={{ marginBottom: "8px" }}>{pin.description}</p>
               <button
                 onClick={() => goToMap(pin)}
                 style={{
@@ -318,7 +270,7 @@ function PinsList({ backendUrl }) {
                   backgroundColor: "#2563eb",
                   border: "none",
                   borderRadius: "5px",
-                  color: "white",
+                  color: "#fff",
                   padding: "6px 12px",
                   cursor: "pointer",
                   fontSize: "14px",
@@ -330,8 +282,56 @@ function PinsList({ backendUrl }) {
           </div>
         );
       })}
+
+      {/* Login Popup */}
+      {showLoginPopup && (
+        <div
+          onClick={() => setShowLoginPopup(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: "#ecececff",
+              color: "#000",
+              padding: "15px",
+              borderRadius: "8px",
+              maxWidth: "20%",
+              textAlign: "center",
+            }}
+          >
+            <p><strong>You must be logged in with Discord to vote.</strong></p>
+            <button
+              onClick={() => setShowLoginPopup(false)}
+              style={{
+                marginTop: "3px",
+                padding: "6px 6px",
+                borderRadius: "5px",
+                border: "none",
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default PinsList;
+
