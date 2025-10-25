@@ -20,6 +20,11 @@ class PinCategory(str, enum.Enum):
     Quest = "Quest"
     Raid = "Raid"
     Dungeon = "Dungeon"
+    FlightPath = "Flight Path"
+    Zone = "Zone"
+    PvP = "PvP"
+    WorldEvent = "World Event"
+    WorldBoss = "World Boss"
 
 class Pin(Base):
     __tablename__ = "pins"
@@ -159,3 +164,7 @@ def vote_pin(vote: VoteSchema, db: Session = Depends(get_db)):
 def get_votes(discord_username: str, db: Session = Depends(get_db)):
     votes = db.query(Vote).filter(Vote.discord_username == discord_username).all()
     return [{"pin_id": v.pin_id, "vote_type": v.vote_type} for v in votes]
+
+@router.get("/categories")
+def get_categories():
+    return [c.value for c in PinCategory]

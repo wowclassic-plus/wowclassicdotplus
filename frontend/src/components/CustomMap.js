@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef  } from "react";
 import {
   MapContainer,
   ImageOverlay,
@@ -8,7 +8,7 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PinForm from "./PinForm";
@@ -27,27 +27,21 @@ L.Icon.Default.mergeOptions({
 
 // Colored markers
 const markerIcons = {
-  blue: new L.Icon({
+  Lore: new L.Icon({
     iconUrl:
       "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/TRACKING/Profession.PNG?raw=true",
-    shadowUrl:
-      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
     iconSize: [40, 40],
     iconAnchor: [20, 41],
     popupAnchor: [1, -34],
-    shadowSize: [41, 41],
   }),
-  red: new L.Icon({
+  Raid: new L.Icon({
     iconUrl:
       "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/Raid_Icon.PNG?raw=true",
-    shadowUrl:
-      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
     iconSize: [75, 75],
     iconAnchor: [35, 55],
     popupAnchor: [1, -34],
-    shadowSize: [41, 41],
   }),
-  green: new L.Icon({
+  Quest: new L.Icon({
     iconUrl:
       "https://i.imgur.com/IPEOEew.png",
     shadowUrl:
@@ -55,17 +49,48 @@ const markerIcons = {
     iconSize: [12, 40],
     iconAnchor: [5, 31],
     popupAnchor: [1, -34],
-    shadowSize: [41, 41],
   }),
-  purple: new L.Icon({
+  Dungeon: new L.Icon({
     iconUrl:
       "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/Dungeon_Icon.PNG?raw=true",
-    shadowUrl:
-      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
     iconSize: [75, 75],
     iconAnchor: [35, 55],
     popupAnchor: [1, -34],
-    shadowSize: [41, 41],
+  }),
+  'Flight Path': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/TRACKING/FlightMaster.PNG?raw=true",
+    iconSize: [40, 40],
+    iconAnchor: [25, 35],
+    popupAnchor: [1, -34],
+  }),
+  'Zone': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/Buttons/UI-PlusButton-Up.PNG?raw=true",
+    iconSize: [40, 40],
+    iconAnchor: [20, 35],
+    popupAnchor: [1, -34],
+  }),
+  'PvP': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/WorldStateFrame/CombatSwords.PNG?raw=true",
+    iconSize: [100, 100],
+    iconAnchor: [25, 45],
+    popupAnchor: [1, -34],
+  }),
+  'World Boss': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/Minimap_skull_normal.PNG?raw=true",
+    iconSize: [50, 50],
+    iconAnchor: [25, 45],
+    popupAnchor: [1, -34],
+  }),
+  'World Event': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/Minimap_shield_elite.PNG?raw=true",
+    iconSize: [50, 50],
+    iconAnchor: [25, 45],
+    popupAnchor: [1, -34],
   }),
 };
 
@@ -122,10 +147,10 @@ function ResetButton({ bounds, setSelectedRegion, setSelectedCategories, allCate
     <div
       style={{
         position: "absolute",
-        top: 300,
+        top: 450,
         left: 10,
         zIndex: 1000,
-        background: "lightgray",
+        background: "darkgray",
         padding: "5px 10px",
         borderRadius: "5px",
         cursor: "pointer",
@@ -145,29 +170,62 @@ export default function CustomMap({ backendUrl }) {
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [newPinDesc, setNewPinDesc] = useState("");
   const [newPinName, setNewPinName] = useState("");
-  const [newPinCategory, setNewPinCategory] = useState("Lore");
+  const [newPinCategory, setNewPinCategory] = useState("");
   const [selectedRegion, setSelectedRegion] = useState("");
-  const { user: discordUser } = useContext(UserContext);
-  const [minUpvotes, setMinUpvotes] = useState(0); // default 0
-  const [selectedCategories, setSelectedCategories] = useState(["Lore", "Quest", "Raid", "Dungeon"]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [allCategories, setAllCategories] = useState([]); // ✅ keep this for dropdowns
   const [votedPins, setVotedPins] = useState({});
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [minUpvotes, setMinUpvotes] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const mapRef = useRef();
+  
+
+  const goToMap = (pin) => {
+    if (location.pathname === "/map") {
+      // Already on the map → send an event or update a shared state
+      window.dispatchEvent(new CustomEvent("map:focus", {
+        detail: { lat: pin.x, lng: pin.y }
+      }));
+    } else {
+      navigate("/map", { state: { lat: pin.x, lng: pin.y } });
+    }
+  };
+
+  useEffect(() => {
+    const handleMapFocus = (e) => {
+      const { lat, lng } = e.detail;
+      if (mapRef.current) {
+        mapRef.current.setView([lat, lng], 3); // Adjust zoom as desired
+      }
+    };
+
+    window.addEventListener("map:focus", handleMapFocus);
+    return () => window.removeEventListener("map:focus", handleMapFocus);
+  }, []);
+
+
+  const { user: discordUser } = useContext(UserContext);
 
   const imageBounds = [
     [0, 0],
     [1500, 2000],
   ];
-  const allCategories = ["Lore", "Quest", "Raid", "Dungeon"];
 
-  const getColor = (category) => {
-    switch ((category || "").toLowerCase()) {
-      case "lore": return "blue";
-      case "quest": return "green";
-      case "raid": return "red";
-      case "dungeon": return "purple";
-      default: return "gray";
-    }
-  };
+  // ✅ Fetch available categories from backend once
+  useEffect(() => {
+    fetch(`${backendUrl}/pins/categories`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAllCategories(data);
+        setSelectedCategories(data);
+        // Only set default category once
+        setNewPinCategory((prev) => prev || data[0]);
+      })
+      .catch((err) => console.error("Failed to fetch categories", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendUrl]);
 
   const isPinInPolygon = (pin, coords) => {
     const polygon = turf.polygon([coords.map(([lat, lng]) => [lng, lat])]);
@@ -219,7 +277,7 @@ export default function CustomMap({ backendUrl }) {
       }
     };
     fetchPins();
-    const interval = setInterval(fetchPins, 5000);
+    const interval = setInterval(fetchPins, 10000);
     return () => clearInterval(interval);
   }, [backendUrl, discordUser]);
 
@@ -293,19 +351,29 @@ export default function CustomMap({ backendUrl }) {
     }
   };
 
+  const paddedBounds = [
+  [-150, -150], // top-left outside the image
+  [1650, 2150], // bottom-right outside the image
+  ];
+
   return (
     <div style={{ paddingTop: "75px" }}>
       <div style={{ display: "flex", height: "100vh" }}>
         {/* Map Area */}
-        <div style={{ flex: 4, position: "relative" }}>
+        <div style={{ flex: 4, position: "relative", background: "#153b65" }}>
           <MapContainer
+            ref={mapRef} // 👈 attach ref
             crs={L.CRS.Simple}
             bounds={imageBounds}
-            maxBounds={imageBounds}
-            style={{ width: "100%", height: "calc(100vh - 60px)" }}
+            maxBounds={paddedBounds}
+            style={{ width: "100%", height: "calc(100vh - 75px)" }}
             doubleClickZoom={false}
+            maxBoundsViscosity={0.5}
+            minZoom={-1}
+            maxZoom={10}
           >
             <PanToPin />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "black" }} />
             <ImageOverlay url="/map.jpg" bounds={imageBounds} />
             <ZoomToRegion polygons={polygons} selectedRegion={selectedRegion} imageBounds={imageBounds} />
             <AddPinOnClick setNewPinCoords={setNewPinCoords} />
@@ -317,17 +385,17 @@ export default function CustomMap({ backendUrl }) {
             />
             <div style={{
               position: "absolute",
-              top: 350,
+              top: 335,
               left: 10,
               zIndex: 1000,
-              background: "lightgray",
+              background: "darkgray",
               padding: "10px",
               borderRadius: "8px",
               width: 180,
               fontWeight: "bold",
               textAlign: "center"
             }}>
-              <div style={{ marginBottom: 10, fontSize: 16 }}>Filter by Pin Popularity</div>
+              <div style={{ marginBottom: 10, fontSize: 12 }}>Filter by Pin Popularity</div>
               <input
                 type="range"
                 min={0}
@@ -363,14 +431,36 @@ export default function CustomMap({ backendUrl }) {
               <Marker
                 key={pin.id}
                 position={[pin.x, pin.y]}
-                icon={markerIcons[getColor(pin.category)] || markerIcons.blue}
+                icon={markerIcons[pin.category] || markerIcons.blue}
               >
                 <Popup>
                   <strong>{pin.name}</strong> ({pin.category})
                   <br />
                   {pin.description}
                   <br />
-                  👍 {pin.upvotes} | 👎 {pin.downvotes}
+                   <button
+                    onClick={() => votePin(pin.id, "up")}
+                    style={{
+                      background: votedPins[pin.id] === "up" ? "green" : "",
+                      color: votedPins[pin.id] === "up" ? "black" : "",
+                      padding: "5px 10px",
+                      borderRadius: "3px",
+                      cursor: votedPins[pin.id] === "up" ? "default" : "pointer",
+                    }}
+                  >
+                    👍 {pin.upvotes}
+                  </button> | <button
+                    onClick={() => votePin(pin.id, "down")}
+                    style={{
+                      background: votedPins[pin.id] === "down" ? "red" : "",
+                      color: votedPins[pin.id] === "down" ? "black" : "",
+                      padding: "5px 10px",
+                      borderRadius: "3px",
+                      cursor: votedPins[pin.id] === "down" ? "default" : "pointer",
+                    }}
+                  >
+                    👎 {pin.downvotes}
+                  </button>
                 </Popup>
               </Marker>
             ))}
@@ -378,12 +468,13 @@ export default function CustomMap({ backendUrl }) {
               <Marker position={newPinCoords}>
                 <Popup>
                   <PinForm
-                    name={newPinName}
-                    setName={setNewPinName}
                     description={newPinDesc}
                     setDescription={setNewPinDesc}
+                    name={newPinName}
+                    setName={setNewPinName}
                     category={newPinCategory}
                     setCategory={setNewPinCategory}
+                    categories={allCategories} // 👈 pass your dynamically fetched categories here
                     onSave={handleSavePin}
                     onCancel={handleCancelPin}
                   />
@@ -393,7 +484,7 @@ export default function CustomMap({ backendUrl }) {
           </MapContainer>
 
           {/* Filters */}
-          <div style={{ position: "absolute", top: 100, left: 10, zIndex: 1000, background: "lightgray", padding: "10px", borderRadius: "8px" }}>
+          <div style={{ position: "absolute", top: 80, left: 10, zIndex: 1000, background: "darkgray", padding: "10px", borderRadius: "8px", fontSize: "12px"}}>
             <strong>Region:</strong>
             <br />
             <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)}>
@@ -422,7 +513,7 @@ export default function CustomMap({ backendUrl }) {
         </div>
 
         {/* Right Panel: Pins List */}
-        <div style={{ flex: 1, top: 0, position: "relative", overflowY: "auto", padding: 10, borderLeft: "1px solid #000", background: "lightgray" }}>
+        <div style={{ flex: 1, top: 0, position: "relative", overflowY: "auto", padding: 10, borderLeft: "1px solid #000", background: "darkgray" }}>
           <h3>Filtered Pins</h3>
           {filteredPins.length === 0 ? (
             <p>No pins</p>
@@ -460,6 +551,21 @@ export default function CustomMap({ backendUrl }) {
                     }}
                   >
                     👎 {pin.downvotes}
+                  </button>
+                  <button
+                    onClick={() => goToMap(pin)}
+                    style={{
+                      marginTop: "6px",
+                      backgroundColor: "#2563eb",
+                      border: "none",
+                      borderRadius: "5px",
+                      color: "#fff",
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    View on Map
                   </button>
                 </div>
               </div>
