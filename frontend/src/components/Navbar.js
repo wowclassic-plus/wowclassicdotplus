@@ -62,7 +62,7 @@ function Navbar() {
           gap: "2.3vw",
         }}
       >
-        {["Home", "Survey", "Results", "Map", "Pins"].map((page) => (
+        {["Home","Dashboard", "Survey", "Results", "Map", "Map2", "Pins"].map((page) => (
           <Link
             key={page}
             to={`/${page.toLowerCase()}`}
