@@ -92,6 +92,13 @@ const markerIcons = {
     iconAnchor: [25, 45],
     popupAnchor: [1, -34],
   }),
+  'Races': new L.Icon({
+    iconUrl:
+      "https://github.com/Gethe/wow-ui-textures/blob/live/MINIMAP/Minimap_shield_elite.PNG?raw=true",
+    iconSize: [50, 50],
+    iconAnchor: [25, 45],
+    popupAnchor: [1, -34],
+  }),
 };
 
 // Double-click to add pin
@@ -373,7 +380,7 @@ export default function CustomMap({ backendUrl }) {
             maxZoom={10}
           >
             <PanToPin />
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "black" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "#167C8B" }} />
             <ImageOverlay url="/map.jpg" bounds={imageBounds} />
             <ZoomToRegion polygons={polygons} selectedRegion={selectedRegion} imageBounds={imageBounds} />
             <AddPinOnClick setNewPinCoords={setNewPinCoords} />
