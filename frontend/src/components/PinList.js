@@ -1,6 +1,37 @@
 import React, { useEffect, useState, useMemo, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import * as turf from "@turf/turf";
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Chip,
+  Collapse,
+  List,
+  ListItem,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
+  useTheme,
+} from "@mui/material";
+import {
+  ExpandMore,
+  ExpandLess,
+  LocationOn,
+  ThumbUp,
+  ThumbDown,
+} from "@mui/icons-material";
 import polygons from "./polygons";
 import { UserContext } from "./UserContext";
 
@@ -20,11 +51,13 @@ const CATEGORY_COLORS = {
 };
 
 function PinsList({ backendUrl }) {
+  const theme = useTheme();
   const { user: discordUser } = useContext(UserContext);
   const [pins, setPins] = useState([]);
   const [filters, setFilters] = useState({ description: "", categories: [], polygon: "" });
   const [votedPins, setVotedPins] = useState({});
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const navigate = useNavigate();
 
   const getPolygonName = (pin) => {
@@ -66,7 +99,14 @@ function PinsList({ backendUrl }) {
     return () => clearInterval(interval);
   }, [backendUrl, discordUser]);
 
-  const goToMap = (pin) => navigate("/map", { state: { lat: pin.x, lng: pin.y } });
+  const goToMap = (pin) => navigate("/map", { 
+    state: { 
+      lat: pin.x, 
+      lng: pin.y, 
+      pinId: pin.id,
+      region: pin.polygon // The region name from getPolygonName
+    } 
+  });
 
   const votePin = async (pinId, type) => {
     if (!discordUser) {
@@ -125,6 +165,13 @@ function PinsList({ backendUrl }) {
     });
   };
 
+  const toggleCategoryExpanded = (category) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   const filteredPins = useMemo(() => {
     return pins
       .filter((pin) => {
@@ -144,194 +191,215 @@ function PinsList({ backendUrl }) {
       .sort((a, b) => b.upvotes - a.upvotes);
   }, [pins, filters]);
 
+  // Group pins by category
+  const pinsByCategory = useMemo(() => {
+    const grouped = {};
+    filteredPins.forEach(pin => {
+      const category = pin.category || "Uncategorized";
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(pin);
+    });
+    return grouped;
+  }, [filteredPins]);
+
+  // Auto-expand categories if only one exists
+  useEffect(() => {
+    const categoryKeys = Object.keys(pinsByCategory);
+    if (categoryKeys.length === 1) {
+      setExpandedCategories({ [categoryKeys[0]]: true });
+    }
+  }, [pinsByCategory]);
+
   return (
-    <div style={{ maxWidth: "900px", margin: "80px auto", padding: "0 20px", backgroundColor: "#949494", minHeight: "100vh", color: "#fff" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>All Pins</h2>
+    <Box sx={{ 
+      maxWidth: "1200px", 
+      margin: "80px auto", 
+      padding: 3,
+      minHeight: "100vh"
+    }}>
+      <Typography variant="h4" component="h2" align="center" gutterBottom>
+        All Pins
+      </Typography>
 
       {/* Filters */}
-      <div style={{ marginBottom: "25px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
-        <input
-          placeholder="Search description..."
-          value={filters.description}
-          onChange={(e) => setFilters({ ...filters, description: e.target.value })}
-          style={{
-            padding: "8px",
-            borderRadius: "5px",
-            border: "1px solid #555",
-            backgroundColor: "#fff",
-            color: "#000",
-            width: "60%",
-          }}
-        />
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
-          {categories.map((cat) => (
-            <label key={cat} style={{ color: "#fff", textTransform: "capitalize" }}>
-              <input
-                type="checkbox"
-                checked={filters.categories.includes(cat)}
-                onChange={() => handleCategoryChange(cat)}
-              />{" "}
-              {cat}
-            </label>
-          ))}
-        </div>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Stack spacing={3}>
+          <TextField
+            placeholder="Search description..."
+            value={filters.description}
+            onChange={(e) => setFilters({ ...filters, description: e.target.value })}
+            fullWidth
+            size="small"
+          />
+          
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Categories
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {categories.map((cat) => (
+                <FormControlLabel
+                  key={cat}
+                  control={
+                    <Checkbox
+                      checked={filters.categories.includes(cat)}
+                      onChange={() => handleCategoryChange(cat)}
+                      size="small"
+                    />
+                  }
+                  label={cat}
+                />
+              ))}
+            </Stack>
+          </Box>
 
-        <select
-          value={filters.polygon}
-          onChange={(e) => setFilters({ ...filters, polygon: e.target.value })}
-          style={{
-            padding: "8px",
-            borderRadius: "5px",
-            border: "1px solid #555",
-            backgroundColor: "#fff",
-            color: "#000",
-            width: "200px",
-          }}
-        >
-          <option value="">All Zones</option>
-          {polygons.map((poly) => (
-            <option key={poly.name} value={poly.name}>
-              {poly.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          <FormControl fullWidth size="small">
+            <InputLabel>Zone</InputLabel>
+            <Select
+              value={filters.polygon}
+              onChange={(e) => setFilters({ ...filters, polygon: e.target.value })}
+              label="Zone"
+            >
+              <MenuItem value="">All Zones</MenuItem>
+              {polygons.map((poly) => (
+                <MenuItem key={poly.name} value={poly.name}>
+                  {poly.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+      </Paper>
 
-      {/* Pins List */}
-      {filteredPins.map((pin) => {
-        const catColor = CATEGORY_COLORS[pin.category?.toLowerCase()] || CATEGORY_COLORS.other;
+      {/* Pins by Category */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          {filteredPins.length} Pins Found
+        </Typography>
+      </Box>
+
+      {Object.entries(pinsByCategory).map(([category, categoryPins]) => {
+        const isExpanded = expandedCategories[category];
+        const catColor = CATEGORY_COLORS[category?.toLowerCase()] || CATEGORY_COLORS.other;
 
         return (
-          <div
-            key={pin.id}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              marginBottom: "18px",
-              backgroundColor: "#fff",
-              borderRadius: "10px",
-              padding: "16px",
-              borderLeft: `8px solid ${catColor}`,
-              color: "#000",
-            }}
-          >
-            {/* Voting */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginRight: "16px", minWidth: "50px" }}>
-              <button
-                onClick={() => votePin(pin.id, "up")}
-                style={{
-                  background: votedPins[pin.id] === "up" ? "green" : "",
-                  color: votedPins[pin.id] === "up" ? "#000" : "#000",
-                  padding: "5px 10px",
-                  borderRadius: "3px",
-                  cursor: "pointer",
-                }}
-              >
-                👍 {pin.upvotes}
-              </button>
-              <button
-                onClick={() => votePin(pin.id, "down")}
-                style={{
-                  background: votedPins[pin.id] === "down" ? "red" : "",
-                  color: votedPins[pin.id] === "down" ? "#000" : "#000",
-                  padding: "5px 10px",
-                  borderRadius: "3px",
-                  cursor: "pointer",
-                }}
-              >
-                👎 {pin.downvotes}
-              </button>
-            </div>
+          <Paper key={category} sx={{ mb: 2 }}>
+            {/* Category Header */}
+            <Box
+              sx={{
+                p: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: catColor,
+                color: "white",
+                cursor: "pointer",
+              }}
+              onClick={() => toggleCategoryExpanded(category)}
+            >
+              <Typography variant="h6" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {category} 
+                <Chip 
+                  label={categoryPins.length} 
+                  size="small" 
+                  sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: theme.palette.common.white }}
+                />
+              </Typography>
+              <IconButton sx={{ color: "white" }} size="small">
+                {isExpanded ? <ExpandLess /> : <ExpandMore />}
+              </IconButton>
+            </Box>
 
-            {/* Content */}
-            <div style={{ flex: 1 }}>
-              <div style={{ marginBottom: "8px" }}>
-                <span
-                  style={{
-                    backgroundColor: catColor,
-                    color: "#fff",
-                    borderRadius: "6px",
-                    padding: "2px 8px",
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    marginRight: "8px",
-                  }}
-                >
-                  {pin.category || "Other"}
-                </span>
-                <span style={{ color: "#555" }}>Zone: {pin.polygon || "Unassigned"}</span>
-              </div>
-              <h3 style={{ margin: "4px 0" }}>{pin.name}</h3>
-              <p style={{ marginBottom: "8px" }}>{pin.description}</p>
-              <button
-                onClick={() => goToMap(pin)}
-                style={{
-                  marginTop: "6px",
-                  backgroundColor: "#2563eb",
-                  border: "none",
-                  borderRadius: "5px",
-                  color: "#fff",
-                  padding: "6px 12px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                View on Map
-              </button>
-            </div>
-          </div>
+            {/* Category Pins */}
+            <Collapse in={isExpanded}>
+              <List sx={{ py: 0 }}>
+                {categoryPins.map((pin) => (
+                  <ListItem key={pin.id} divider sx={{ py: 2 }}>
+                    <Box sx={{ width: '100%' }}>
+                      {/* Pin Header */}
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                        <Typography variant="h6" component="h3">
+                          {pin.name}
+                        </Typography>
+                        <Chip 
+                          label={pin.polygon || "Unassigned"} 
+                          size="small" 
+                          variant="outlined"
+                        />
+                      </Box>
+
+                      {/* Description */}
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {pin.description}
+                      </Typography>
+
+                      {/* Actions */}
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        {/* Voting */}
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant={votedPins[pin.id] === "up" ? "contained" : "outlined"}
+                            color="success"
+                            startIcon={<ThumbUp />}
+                            onClick={() => votePin(pin.id, "up")}
+                          >
+                            {pin.upvotes}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant={votedPins[pin.id] === "down" ? "contained" : "outlined"}
+                            color="error"
+                            startIcon={<ThumbDown />}
+                            onClick={() => votePin(pin.id, "down")}
+                          >
+                            {pin.downvotes}
+                          </Button>
+                        </Stack>
+
+                        {/* View on Map */}
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<LocationOn />}
+                          onClick={() => goToMap(pin)}
+                        >
+                          View on Map
+                        </Button>
+                      </Box>
+                    </Box>
+                  </ListItem>
+                ))}
+              </List>
+            </Collapse>
+          </Paper>
         );
       })}
 
-      {/* Login Popup */}
-      {showLoginPopup && (
-        <div
-          onClick={() => setShowLoginPopup(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "#ecececff",
-              color: "#000",
-              padding: "15px",
-              borderRadius: "8px",
-              maxWidth: "20%",
-              textAlign: "center",
-            }}
-          >
-            <p><strong>You must be logged in with Discord to vote.</strong></p>
-            <button
-              onClick={() => setShowLoginPopup(false)}
-              style={{
-                marginTop: "3px",
-                padding: "6px 6px",
-                borderRadius: "5px",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {filteredPins.length === 0 && (
+        <Paper sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" color="text.secondary">
+            No pins found matching your filters
+          </Typography>
+        </Paper>
       )}
-    </div>
+
+      {/* Login Dialog */}
+      <Dialog open={showLoginPopup} onClose={() => setShowLoginPopup(false)}>
+        <DialogTitle>Login Required</DialogTitle>
+        <DialogContent>
+          <Typography>
+            You must be logged in with Discord to vote.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowLoginPopup(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
 
 export default PinsList;
-
