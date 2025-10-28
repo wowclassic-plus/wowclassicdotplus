@@ -1,14 +1,24 @@
 import React, { useContext } from "react";
+import {
+  Button,
+  Box,
+  Avatar,
+  Typography,
+  useTheme,
+  // useMediaQuery,
+} from "@mui/material";
 import { UserContext } from "./UserContext";
 
 const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID;
 const FRONTEND_REDIRECT = process.env.REACT_APP_FRONTEND_REDIRECT;
 
 export default function NavbarDiscordLogin() {
+  const theme = useTheme();
+  // const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { user, logout } = useContext(UserContext);
 
   if (!CLIENT_ID || !FRONTEND_REDIRECT) {
-    return null; // Do not render login button if misconfigured
+    return null;
   }
 
   const handleLogin = () => {
@@ -19,87 +29,86 @@ export default function NavbarDiscordLogin() {
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "1vw" }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
       {!user ? (
-        <button
+        <Button
+          variant="contained"
           onClick={handleLogin}
-          style={{
+          sx={{
             backgroundColor: "#5865F2",
             color: "white",
-            padding: "0.6vw 1.2vw",
-            border: "none",
-            borderRadius: "0.6vw",
+            padding: { xs: '8px 16px', sm: '10px 20px' },
+            borderRadius: 2,
             fontWeight: "bold",
-            fontSize: "1vw",
-            cursor: "pointer",
-            transition: "transform 0.2s ease, box-shadow 0.3s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.05)";
-            e.currentTarget.style.boxShadow = "0 0 1vw rgba(88, 101, 242, 0.5)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1.0)";
-            e.currentTarget.style.boxShadow = "none";
+            fontSize: { xs: '0.875rem', sm: '0.9rem', md: '1rem' },
+            textTransform: 'none',
+            minWidth: 'auto',
+            whiteSpace: 'nowrap',
+            '&:hover': {
+              backgroundColor: '#4752C4',
+              transform: 'scale(1.05)',
+              boxShadow: '0 0 15px rgba(88, 101, 242, 0.5)',
+            },
+            transition: 'all 0.3s ease',
           }}
         >
           Login with Discord
-        </button>
+        </Button>
       ) : (
-        <div
-          style={{
+        <Box
+          sx={{
             display: "flex",
             alignItems: "center",
-            gap: "0.8vw",
-            flexWrap: "wrap",
+            gap: { xs: 1, sm: 1.5 },
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            justifyContent: { xs: 'center', sm: 'flex-start' },
           }}
         >
-          <img
+          <Avatar
             src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`}
             alt="avatar"
-            style={{
-              width: "2.2vw",
-              height: "2.2vw",
-              borderRadius: "50%",
-              objectFit: "cover",
-              border: "0.15vw solid rgba(255,255,255,0.8)",
+            sx={{
+              width: { xs: 32, sm: 40 },
+              height: { xs: 32, sm: 40 },
+              border: `2px solid ${theme.palette.background.paper}`,
             }}
           />
-          <span
-            style={{
+          <Typography
+            variant="body1"
+            sx={{
               color: "white",
               fontWeight: "bold",
-              fontSize: "1vw",
+              fontSize: { xs: '0.875rem', sm: '0.9rem', md: '1rem' },
               whiteSpace: "nowrap",
+              display: { xs: 'none', sm: 'block' },
             }}
           >
             {user.username}#{user.discriminator}
-          </span>
-          <button
+          </Typography>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
             onClick={logout}
-            style={{
-              backgroundColor: "#ff4d4d",
-              color: "white",
-              border: "none",
-              padding: "0.4vw 0.8vw",
-              borderRadius: "0.4vw",
-              cursor: "pointer",
-              fontSize: "0.9vw",
-              transition: "transform 0.2s ease, box-shadow 0.3s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.05)";
-              e.currentTarget.style.boxShadow = "0 0 0.8vw rgba(255, 77, 77, 0.5)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1.0)";
-              e.currentTarget.style.boxShadow = "none";
+            sx={{
+              padding: { xs: '6px 12px', sm: '8px 16px' },
+              borderRadius: 1.5,
+              fontSize: { xs: '0.75rem', sm: '0.8rem' },
+              textTransform: 'none',
+              minWidth: 'auto',
+              whiteSpace: 'nowrap',
+              '&:hover': {
+                backgroundColor: '#d93636',
+                transform: 'scale(1.05)',
+                boxShadow: '0 0 12px rgba(255, 77, 77, 0.5)',
+              },
+              transition: 'all 0.3s ease',
             }}
           >
             Logout
-          </button>
-        </div>
+          </Button>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
