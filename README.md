@@ -16,7 +16,7 @@ A full-stack application with React frontend and FastAPI backend.
    - **macOS/Linux**: `source venv/bin/activate`
 4. Install Python dependencies: `pip install -r requirements.txt`
 5. Create a `.env` file in the backend directory with the environment variables below
-6. Start the backend server: `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
+6. Start the backend server: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
 The backend will be available at: **http://localhost:8000**
 
