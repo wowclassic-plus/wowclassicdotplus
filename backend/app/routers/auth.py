@@ -12,7 +12,7 @@ router = APIRouter(prefix="/auth/discord", tags=["auth"])
 # Load environment variables
 CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI")
+REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
 # Discord OAuth is optional - only enable if all required env vars are set
 DISCORD_OAUTH_ENABLED = bool(CLIENT_ID and CLIENT_SECRET and REDIRECT_URI)
