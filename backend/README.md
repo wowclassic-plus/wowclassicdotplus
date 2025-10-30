@@ -4,7 +4,7 @@ FastAPI backend with PostgreSQL.
 
 ## Quick Start
 
-Prerequisites: Docker, Docker Compose, Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/)
+Prerequisites: [Docker](https://www.docker.com/products/docker-desktop/), Docker Compose, Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### Automated Setup
 
