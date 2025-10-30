@@ -48,9 +48,6 @@ class Vote(Base):
 
     __table_args__ = (UniqueConstraint('pin_id', 'discord_username', name='_pin_discord_uc'),)
 
-
-Base.metadata.create_all(bind=engine)
-
 # --- Pydantic Schema ---
 class PinSchema(BaseModel):
     id: int | None = None
@@ -63,7 +60,7 @@ class PinSchema(BaseModel):
     downvotes: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- DB Dependency ---
 def get_db():
