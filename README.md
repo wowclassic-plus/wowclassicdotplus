@@ -35,7 +35,7 @@ The frontend will be available at: **http://localhost:3000**
 Create this file in the `backend` directory:
 1. DISCORD_CLIENT_ID=*See Discord for this
 2. DISCORD_CLIENT_SECRET=*See Discord for this
-3. REDIRECT_URI=http://localhost:3000/auth/callback
+3. DISCORD_REDIRECT_URI=http://localhost:3000/auth/callback
 4. DATABASE_URL=*See Discord for this
 
 

@@ -1,6 +1,12 @@
 # scripts/populate_pins.py
 import random
+import sys
+import os
 from sqlalchemy.orm import Session
+
+# Add the current directory to Python path so we can import from app
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from app.database import SessionLocal, engine, Base
 from app.routers.pins import Pin, PinCategory, Vote
 
@@ -27,9 +33,19 @@ def random_votes():
 
 # --- Populate ---
 def main():
+    # Create all tables first
+    Base.metadata.create_all(bind=engine)
+    
     db: Session = SessionLocal()
     try:
-        for _ in range(NUM_PINS):
+        # Check if pins already exist
+        existing_pins = db.query(Pin).count()
+        if existing_pins > 0:
+            print(f"Database already contains {existing_pins} pins. Skipping population.")
+            return
+            
+        print(f"Adding {NUM_PINS} random pins...")
+        for i in range(NUM_PINS):
             x = random.uniform(X_MIN, X_MAX)
             y = random.uniform(Y_MIN, Y_MAX)
             category = random.choice(CATEGORIES)
@@ -47,8 +63,17 @@ def main():
                 downvotes=downvotes
             )
             db.add(pin)
+            
+            # Progress indicator
+            if (i + 1) % 20 == 0:
+                print(f"Added {i + 1}/{NUM_PINS} pins...")
+                
         db.commit()
         print(f"Successfully added {NUM_PINS} random pins!")
+    except Exception as e:
+        print(f"Error adding pins: {e}")
+        db.rollback()
+        raise
     finally:
         db.close()
 
